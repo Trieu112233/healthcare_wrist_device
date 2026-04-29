@@ -4,6 +4,7 @@
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <time.h> // <=== Bổ sung thư viện time.h ở đầu file mạng
 
 WiFiClientSecure espClient;
 PubSubClient mqttClient(espClient);
@@ -16,8 +17,9 @@ void setupNetwork() {
     portEXIT_CRITICAL(&serialMutex);
 
     WiFi.mode(WIFI_STA);
-    WiFi.setTxPower(WIFI_POWER_8_5dBm); // Giảm công suất WiFi để chống nhiễu Mic INMP441
+    WiFi.setTxPower(WIFI_POWER_8_5dBm); 
     WiFi.begin(WIFI_SSID, WIFI_PASS);
+    
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
@@ -27,7 +29,24 @@ void setupNetwork() {
     Serial.println("\nWiFi connected!");
     portEXIT_CRITICAL(&serialMutex);
 
-    // KẾT NỐI QUA BẢO MẬT TLS (Bỏ qua cert đối với Demo HiveMQ)
+    // ==========================================
+    // KHỞI TẠO ĐỒNG BỘ THỜI GIAN QUA INTERNET (NTP)
+    // ==========================================
+    const char* ntpServer = "pool.ntp.org";
+    const long  gmtOffset_sec = 7 * 3600; // Múi giờ Việt Nam (GMT+7)
+    const int   daylightOffset_sec = 0;   // Không có giờ mùa hè
+
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 10000)) { // Chờ tối đa 10s để đồng bộ mạng
+        Serial.println("Time synchronized successfully!");
+    } else {
+        Serial.println("Failed to obtain time");
+    }
+    // ==========================================
+
+    // KẾT NỐI QUA BẢO MẬT TLS
     espClient.setInsecure(); 
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
 }

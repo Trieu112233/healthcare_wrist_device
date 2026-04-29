@@ -24,6 +24,8 @@ struct AudioSignalContext {
 static IMUSignalContext imu_ctx;
 static AudioSignalContext audio_ctx;
 
+static float inference_imu_snapshot[IMU_TOTAL_SAMPLES * 6]; // Dùng để chốt snapshot của IMU khi vào suy luận
+
 // Callback cho mô hình Fall Detection (IMU)
 static int extract_imu_signal(size_t offset, size_t length, float *out_ptr) {
     for (size_t i = 0; i < length; i++) {
@@ -33,7 +35,7 @@ static int extract_imu_signal(size_t offset, size_t length, float *out_ptr) {
         
         // Đọc vòng từ buffer
         size_t physical_sample_idx = (inference_imu_head + sample_idx) % IMU_TOTAL_SAMPLES;
-        out_ptr[i] = imu_ctx.buffer[physical_sample_idx * 6 + axis_idx];
+        out_ptr[i] = inference_imu_snapshot[physical_sample_idx * 6 + axis_idx];
     }
     return 0; 
 }
@@ -52,7 +54,10 @@ static int extract_audio_signal(size_t offset, size_t length, float *out_ptr) {
 
 void run_ai_inference() {
     // Chốt snapshot buffer của IMU
+    portENTER_CRITICAL(&dataReadyMutex);
     inference_imu_head = imu_head;
+    memcpy(inference_imu_snapshot, imuBuffer, IMU_TOTAL_SAMPLES * 6 * sizeof(float));
+    portEXIT_CRITICAL(&dataReadyMutex);
 
     portENTER_CRITICAL(&serialMutex);
     Serial.println("\nSEQUENTIAL INFERENCE RUNNING   ║");
@@ -62,7 +67,7 @@ void run_ai_inference() {
     uint32_t t1 = millis();
     
     // ===== [1/2] FALL DETECTION =====
-    imu_ctx.buffer = imuBuffer;
+    imu_ctx.buffer = inference_imu_snapshot;
     imu_ctx.num_samples = IMU_TOTAL_SAMPLES * 6;
     
     signal_t imu_signal;
@@ -147,7 +152,7 @@ void run_ai_inference() {
         }
     }
 
-    updateDisplay(actFall, actScream);
+    updateAlertUI(actFall, actScream);
 
     if (actFall >= ALERT_THRESHOLD || actScream >= ALERT_THRESHOLD) {
         publishAlert(actFall, actScream);

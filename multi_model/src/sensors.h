@@ -5,6 +5,9 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+extern TaskHandle_t imuTaskHandle;
+extern TaskHandle_t micTaskHandle;
+
 #define IMU_TOTAL_SAMPLES 200          // 4 giây * 50Hz = 200 mẫu
 #define AUDIO_SAMPLE_RATE 16000
 #define AUDIO_SAMPLES_PER_CYCLE 16000  // 1 giây = 16000 mẫu
@@ -25,5 +28,6 @@ extern portMUX_TYPE dataReadyMutex;
 void allocateSensorBuffers();
 void setupSensors();
 void startSensorTasks();
+void goToDeepSleep();
 
 #endif // SENSORS_H

@@ -4,10 +4,17 @@
 #include "SparkFunLSM6DS3.h"
 #include "driver/i2s.h"
 #include "esp_heap_caps.h"
+#include "driver/rtc_io.h"
+#include "display_app.h"
 
 // ===== IMU CONFIGURATION =====
 LSM6DS3 myIMU(I2C_MODE, 0x6B);
-float gyroBiasX = 0, gyroBiasY = 0, gyroBiasZ = 0;
+
+// Biến lưu trữ Gyro Bias để hiệu chỉnh (song qua deepsleep)
+RTC_DATA_ATTR float gyroBiasX = 0;
+RTC_DATA_ATTR float gyroBiasY = 0;
+RTC_DATA_ATTR float gyroBiasZ = 0;
+RTC_DATA_ATTR bool isCalibrated = false;
 
 // Các biến phục vụ Ring Buffer
 float* imuBuffer = NULL;
@@ -20,6 +27,10 @@ int16_t* audioBuffer = NULL;
 // ===== SYNCHRONIZATION =====
 portMUX_TYPE serialMutex = portMUX_INITIALIZER_UNLOCKED;
 portMUX_TYPE dataReadyMutex = portMUX_INITIALIZER_UNLOCKED;
+
+// Khai báo thực thể của 2 biến handle đã extern ở sensors.h
+TaskHandle_t imuTaskHandle = NULL;
+TaskHandle_t micTaskHandle = NULL;
 
 bool audioDataReady = false;
 
@@ -59,31 +70,54 @@ void setupIMU() {
         portEXIT_CRITICAL(&serialMutex);
         while(1) delay(100);
     }
-    
-    portENTER_CRITICAL(&serialMutex);
-    Serial.println("Calibrating Gyro in 3s...");
-    portEXIT_CRITICAL(&serialMutex);
-    
-    delay(1000);
-    
-    int numSamples = 200;
-    for (int i = 0; i < numSamples; i++) {
-        gyroBiasX += myIMU.readFloatGyroX();
-        gyroBiasY += myIMU.readFloatGyroY();
-        gyroBiasZ += myIMU.readFloatGyroZ();
-        delay(10); 
+
+    // 1. KIỂM TRA LÝ DO KHỞI ĐỘNG
+    if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
+        portENTER_CRITICAL(&serialMutex);
+        Serial.println("🚀 ĐÃ THỨC DẬY do có chuyển động!");
+        portEXIT_CRITICAL(&serialMutex);
+    } else {
+        portENTER_CRITICAL(&serialMutex);
+        Serial.println("🔌 Cấp nguồn lần đầu (Cold Boot). Bắt buộc Calib!");
+        portEXIT_CRITICAL(&serialMutex);
+        isCalibrated = false; 
+    }
+
+    // 2. CHẠY THUẬT TOÁN CALIB NẾU CHƯA CÓ
+    if (!isCalibrated) {
+        portENTER_CRITICAL(&serialMutex);
+        Serial.println("Calibrating Gyro in 3s...");
+        portEXIT_CRITICAL(&serialMutex);
+        
+        delay(3000); // Chờ 3 giây để ổn định
+        
+        int numSamples = 200;
+        gyroBiasX = 0; gyroBiasY = 0; gyroBiasZ = 0;
+        for (int i = 0; i < numSamples; i++) {
+            gyroBiasX += myIMU.readFloatGyroX();
+            gyroBiasY += myIMU.readFloatGyroY();
+            gyroBiasZ += myIMU.readFloatGyroZ();
+            delay(10); 
+        }
+        
+        gyroBiasX /= numSamples;
+        gyroBiasY /= numSamples;
+        gyroBiasZ /= numSamples;
+        
+        isCalibrated = true;
+        
+        portENTER_CRITICAL(&serialMutex);
+        Serial.print("Calib done! Gyro Bias: ");
+        Serial.print(gyroBiasX); Serial.print(", ");
+        Serial.print(gyroBiasY); Serial.print(", ");
+        Serial.println(gyroBiasZ);
+        portEXIT_CRITICAL(&serialMutex);
+    } else {
+        portENTER_CRITICAL(&serialMutex);
+        Serial.printf("Bỏ qua Calib. Dùng lại sai số cũ: X=%.2f, Y=%.2f, Z=%.2f\n", gyroBiasX, gyroBiasY, gyroBiasZ);
+        portEXIT_CRITICAL(&serialMutex);
     }
     
-    gyroBiasX /= numSamples;
-    gyroBiasY /= numSamples;
-    gyroBiasZ /= numSamples;
-    
-    portENTER_CRITICAL(&serialMutex);
-    Serial.print("Calib done! Gyro Bias: ");
-    Serial.print(gyroBiasX); Serial.print(", ");
-    Serial.print(gyroBiasY); Serial.print(", ");
-    Serial.println(gyroBiasZ);
-    portEXIT_CRITICAL(&serialMutex);
     delay(1000);
 }
 
@@ -180,6 +214,42 @@ void setupSensors() {
 }
 
 void startSensorTasks() {
-    xTaskCreatePinnedToCore(micTask, "Mic_Task", 8192, NULL, 2, NULL, 1);
-    xTaskCreatePinnedToCore(imuTask, "IMU_Task", 4096, NULL, 2, NULL, 0);
+    xTaskCreatePinnedToCore(micTask, "Mic_Task", 8192, NULL, 2, &micTaskHandle, 1);
+    xTaskCreatePinnedToCore(imuTask, "IMU_Task", 4096, NULL, 2, &imuTaskHandle, 0);
+}
+
+void goToDeepSleep() {
+    portENTER_CRITICAL(&serialMutex);
+    Serial.println("Entering deep sleep mode...");
+    portEXIT_CRITICAL(&serialMutex);
+
+    // 1. Ghi cấu hình WakeUp vào cảm biến qua I2C
+    Wire.beginTransmission(0x6B); Wire.write(0x10); Wire.write(0x60); Wire.endTransmission();
+    Wire.beginTransmission(0x6B); Wire.write(0x58); Wire.write(0x80); Wire.endTransmission();
+    Wire.beginTransmission(0x6B); Wire.write(0x5C); Wire.write(0x00); Wire.endTransmission();
+    Wire.beginTransmission(0x6B); Wire.write(0x5B); Wire.write(0x02); Wire.endTransmission();
+    Wire.beginTransmission(0x6B); Wire.write(0x5E); Wire.write(0x20); Wire.endTransmission();
+
+    delay(100); 
+
+    // 2. Chốt xóa cờ Interrupt cũ (Hạ mức INT1 xuống thấp)
+    Wire.beginTransmission(0x6B);
+    Wire.write(0x1B);
+    Wire.endTransmission(false);
+    Wire.requestFrom(0x6B, 1);
+    if (Wire.available()) {
+        Wire.read(); 
+    }
+    // 3. Cấu hình chân phần cứng để nhận ngắt từ IMU
+    rtc_gpio_pulldown_en((gpio_num_t)IMU_INT1_PIN);
+    rtc_gpio_pullup_dis((gpio_num_t)IMU_INT1_PIN);
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT1_PIN, 1);
+
+    // ngat audio va man hinh
+    sleepDisplay();
+    i2s_driver_uninstall(I2S_PORT);
+
+    // xa serial, bat dau ngu
+    Serial.flush();
+    esp_deep_sleep_start();
 }

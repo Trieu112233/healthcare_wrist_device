@@ -17,7 +17,7 @@ public:
         cfg.spi_mode = 0;
         cfg.freq_write = 40000000; // Tốc độ SPI 40MHz cho mượt
         cfg.freq_read  = 16000000;
-        cfg.spi_3wire  = true;
+        cfg.spi_3wire  = false;
         
         // Gọi thẳng các chân từ config.h
         cfg.pin_sclk = TFT_SCK;
@@ -33,6 +33,8 @@ public:
         pcfg.pin_rst  = TFT_RST;
         pcfg.pin_busy = -1;
         
+        pcfg.memory_width  = 240;  // <=== THÊM DÒNG NÀY
+        pcfg.memory_height = 240;  // <=== THÊM DÒNG NÀY
         pcfg.panel_width  = 240;
         pcfg.panel_height = 240;
         pcfg.offset_x     = 0;
@@ -52,6 +54,8 @@ public:
 };
 
 void setupDisplay();
-void updateDisplay(float fall_conf, float scream_conf);
+void updateAlertUI(float fall_conf, float scream_conf);
+void updateTimeUI();
+void sleepDisplay();
 
 #endif
