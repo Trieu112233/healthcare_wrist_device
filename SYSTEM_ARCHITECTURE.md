@@ -152,16 +152,4 @@ MQTT Input → Parse JSON → Validate → Firestore Update
 
 ---
 
-## Performance
-
-| Metric | Value |
-|--------|-------|
-| ML Inference Latency | ~150ms |
-| MQTT Publish | ~100ms |
-| Firestore Update | ~500ms |
-| Mobile Response | ~1s |
-| **Total Delay** | **~2s** |
-
----
-
 **Phục vụ cho khóa luận tốt nghiệp: Hệ thống Đeo tay Chăm sóc Sức khỏe**
