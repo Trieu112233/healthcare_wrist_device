@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212">
+
+    <!-- 1. Hình nền (Bạn hãy thay @drawable/bg_fitness bằng ảnh của bạn) -->
+    <ImageView
+        android:id="@+id/loginImgBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/login_background"
+        android:alpha="0.4" /> <!-- Độ mờ 0.4 để giữ vibe Dark Mode -->
+
+    <!-- Lớp phủ Gradient mờ để làm nổi bật text (Tùy chọn) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp"
+        app:layout_constraintBottom_toTopOf="@+id/loginImgBackground"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/loginImgBackground">
+
+        <!-- Logo -->
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginBottom="16dp"
+            android:src="@android:drawable/ic_menu_compass"
+            app:tint="#00E676" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-black"
+            android:letterSpacing="0.1"
+            android:text="SMART WATCH"
+            android:textColor="#FFFFFF"
+            android:textSize="28sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="40dp"
+            android:text="Theo dõi sức khỏe gia đình bạn"
+            android:textColor="#D1D1D1"
+            android:textSize="14sp" />
+
+        <!-- Ô nhập Username với hiệu ứng bo góc mềm mại hơn -->
+        <EditText
+            android:id="@+id/loginEdtUserphone"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/custom_input_bg"
+            android:hint="Số điện thoại"
+            android:inputType="textPhonetic"
+            android:paddingHorizontal="20dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#707070" />
+        <!-- Ô nhập Password -->
+        <EditText
+            android:id="@+id/loginEdtPassword"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginBottom="32dp"
+            android:background="@drawable/custom_input_bg"
+            android:hint="Mật khẩu"
+            android:inputType="textPassword"
+            android:paddingHorizontal="20dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#707070" />
+
+        <!-- Nút Đăng nhập Gradient hoặc Solid -->
+        <Button
+            android:id="@+id/loginBtnLogin"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:backgroundTint="#00E676"
+            android:text="ĐĂNG NHẬP"
+            android:textColor="#000000"
+            android:textStyle="bold"
+            app:cornerRadius="12dp" />
+
+        <TextView
+            android:id="@+id/loginTextForgotPassword"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:padding="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="Bạn chưa có tài khoản? Đăng ký"
+            android:textColor="#00E676"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

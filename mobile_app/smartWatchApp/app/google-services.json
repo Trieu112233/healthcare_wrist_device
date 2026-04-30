@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "850100205498",
+    "project_id": "fall-detection-alert-d5168",
+    "storage_bucket": "fall-detection-alert-d5168.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:850100205498:android:258fded92445b446b20f83",
+        "android_client_info": {
+          "package_name": "com.example.smartwatchapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByVqqlLedaIeKPsUiqsyioRIEnJueIrx0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

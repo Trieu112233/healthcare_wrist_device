@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/emergency_red"
+    android:padding="24dp">
+
+    <!-- Icon cảnh báo lớn -->
+    <ImageView
+        android:id="@+id/imgWarning"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_marginTop="60dp"
+        android:src="@android:drawable/stat_sys_warning"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="@color/white" />
+
+    <TextView
+        android:id="@+id/tvAlertHeader"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="CẢNH BÁO KHẨN CẤP"
+        android:textColor="@color/white"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/imgWarning" />
+
+    <!-- Loại cảnh báo (Vd: NGÃ ĐỔ) -->
+    <TextView
+        android:id="@+id/tvAlertType"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="PHÁT HIỆN TIẾNG HÉT"
+        android:textColor="#FFEB3B"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvAlertHeader" />
+
+    <!-- Tên thiết bị -->
+    <TextView
+        android:id="@+id/tvDeviceName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Thiết bị: xiao_esp32s3_01"
+        android:textColor="@color/white"
+        android:textSize="18sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvAlertType" />
+
+    <TextView
+        android:id="@+id/tvAlertTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Thời gian: 12:30:45"
+        android:textColor="@color/white"
+        android:textSize="14sp"
+        android:alpha="0.8"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvDeviceName" />
+
+    <!-- Nút Xác nhận (Acknowledge) -->
+    <Button
+        android:id="@+id/btnAcknowledge"
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:layout_marginBottom="40dp"
+        android:backgroundTint="@color/white"
+        android:text="XÁC NHẬN &amp; TẮT BÁO ĐỘNG"
+        android:textColor="@color/emergency_red"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        app:cornerRadius="35dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

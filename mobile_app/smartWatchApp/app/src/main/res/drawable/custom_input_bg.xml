@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Khi người dùng đang nhấn vào ô (Focus) -->
+    <item android:state_focused="true">
+        <shape>
+            <solid android:color="#22FFFFFF" /> <!-- Nền hơi sáng lên một chút -->
+            <stroke
+                android:width="2dp"
+                android:color="#00E676" /> <!-- Viền màu xanh Neon nổi bật -->
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+
+    <!-- Trạng thái bình thường -->
+    <item>
+        <shape>
+            <solid android:color="#1AFFFFFF" /> <!-- Nền tối trong suốt -->
+            <stroke
+                android:width="1dp"
+                android:color="#44FFFFFF" /> <!-- Viền trắng mờ -->
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+</selector>
