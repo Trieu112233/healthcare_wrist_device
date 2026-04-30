@@ -1,4 +1,4 @@
-# 🏗️ System Architecture - Hệ thống Đeo tay Chăm sóc Sức khỏe
+# 🏗️ System Architecture 
 
 ## Kiến Trúc Tổng Thể
 
@@ -13,19 +13,19 @@
 └──────────────┘         └──────────────┘         └──────────────┘
       │                                                    │
       │ (Fall + Scream                                    │
-      │  Detection Alert)                  ┌──────────────┴──────────┐
-      │                                     │                        │
-      │                            ┌────────▼────────┐      ┌────────▼──┐
-      │                            │  Firestore DB   │      │ Firebase  │
-      │                            │  (Real-time)    │      │ (Auth)    │
-      │                            └─────────┬───────┘      └───────────┘
+      │  Detection Alert)                  ┌──────────────┴
+      │                                     │                        
+      │                            ┌────────▼────────┐     
+      │                            │  Firestore DB   │      
+      │                            │  (Real-time)    │      
+      │                            └─────────┬───────┘      
       │                                      │
-      │                            ┌─────────┴──────────┐
-      │                            │                    │
-      │                    ┌───────▼──────┐    ┌────────▼──────┐
-      │                    │ Mobile App   │    │ Desktop Web   │
-      │                    │ (Android)    │    │ (Optional)    │
-      │                    └──────────────┘    └───────────────┘
+      │                            ┌─────────┴
+      │                            │                    
+      │                    ┌───────▼──────┐    
+      │                    │ Mobile App   │    
+      │                    │ (Android)    │    
+      │                    └──────────────┘    
 ```
 
 ## Components Chi Tiết
