@@ -12,6 +12,7 @@
 #include "sensors.h"
 #include "ai_inference.h"
 #include "display_app.h"
+#include "ble_provisioning.h"
 #include <lvgl.h> 
 
 unsigned long lastMotionTime = 0;
@@ -34,34 +35,36 @@ void setup() {
     portEXIT_CRITICAL(&serialMutex);
 
     // 2. KẾT NỐI MẠNG & THỜI GIAN (Blocking)
-    setupNetwork(); 
+    if (!setupNetwork()) {
+        setupBLE();
+    } else {
+        // 3. CẬP NHẬT GIỜ LÊN MÀN HÌNH (Lúc này có mạng -> Hiện giờ, đổi chữ thành "SAFE")
+        updateTimeUI();
+        for(int i=0; i<10; i++) { lv_timer_handler(); delay(5); } // Kịp render giờ và đổi chữ
 
-    // 3. CẬP NHẬT GIỜ LÊN MÀN HÌNH (Lúc này có mạng -> Hiện giờ, đổi chữ thành "SAFE")
-    updateTimeUI();
-    for(int i=0; i<10; i++) { lv_timer_handler(); delay(5); } // Kịp render giờ và đổi chữ
 
+        // 2. Cấp phát vùng nhớ, Khởi tạo MCU I2S, I2C/IMU
+        allocateSensorBuffers();
+        setupSensors();
 
-    // 2. Cấp phát vùng nhớ, Khởi tạo MCU I2S, I2C/IMU
-    allocateSensorBuffers();
-    setupSensors();
+        portENTER_CRITICAL(&serialMutex);
+        Serial.println("\n[INIT] Starting FreeRTOS tasks...");
+        portEXIT_CRITICAL(&serialMutex);
+        
+        // 3. Kích hoạt FreeRTOS Tasks
+        startSensorTasks();
 
-    portENTER_CRITICAL(&serialMutex);
-    Serial.println("\n[INIT] Starting FreeRTOS tasks...");
-    portEXIT_CRITICAL(&serialMutex);
-    
-    // 3. Kích hoạt FreeRTOS Tasks
-    startSensorTasks();
+        portENTER_CRITICAL(&serialMutex);
+        Serial.println("\nSYSTEM READY");
+        Serial.println("  Waiting 4s for IMU buffer warm-up...\n");
+        portEXIT_CRITICAL(&serialMutex);
 
-    portENTER_CRITICAL(&serialMutex);
-    Serial.println("\nSYSTEM READY");
-    Serial.println("  Waiting 4s for IMU buffer warm-up...\n");
-    portEXIT_CRITICAL(&serialMutex);
-
-    // 5. WARM-UP 4 GIÂY (Cho phép màn hình vẫn chạy animation)
-    unsigned long start_warmup = millis();
-    while (millis() - start_warmup < 4000) {
-        lv_timer_handler(); // Giữ cho màn hình không bị đơ
-        delay(10);
+        // 5. WARM-UP 4 GIÂY (Cho phép màn hình vẫn chạy animation)
+        unsigned long start_warmup = millis();
+        while (millis() - start_warmup < 4000) {
+            lv_timer_handler(); // Giữ cho màn hình không bị đơ
+            delay(10);
+        }
     }
 
     lastMotionTime = millis(); // Reset lại đồng hồ đếm thời gian sau khi IMU đã ổn định
@@ -70,11 +73,16 @@ void setup() {
 
 // ========== MAIN LOOP ==========
 void loop() {
-    bool hasAudioData = false;
-
     // --- BỔ SUNG CHO MÀN HÌNH LVGL ---
     lv_timer_handler(); // Hàm xử lý công việc hiển thị (vẽ, update text, animation...)
     // ---------------------------------
+
+    if (provisioningMode) {
+        checkBLEProvisioning();
+        return; // Don't run AI tasks during provisioning
+    }
+
+    bool hasAudioData = false;
 
     // Xem liệu Mic đã thu đủ 1s audio chưa
     portENTER_CRITICAL(&dataReadyMutex);

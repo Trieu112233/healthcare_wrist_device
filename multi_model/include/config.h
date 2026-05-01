@@ -2,8 +2,7 @@
 #define CONFIG_H
 
 // --- THÔNG TIN WIFI ---
-#define WIFI_SSID "***"
-#define WIFI_PASS "***"
+// Nhận qua BLE provisioning
 
 // --- THÔNG TIN HIVEMQ CLOUD (Bảo mật TLS/SSL) ---
 #define MQTT_SERVER "***"

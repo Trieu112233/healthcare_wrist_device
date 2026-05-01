@@ -4,25 +4,48 @@
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-#include <time.h> // <=== Bổ sung thư viện time.h ở đầu file mạng
+#include <time.h> // Bổ sung thư viện time.h ở đầu file mạng
+#include <Preferences.h>
 
 WiFiClientSecure espClient;
 PubSubClient mqttClient(espClient);
 extern portMUX_TYPE serialMutex;
 
-void setupNetwork() {
+bool setupNetwork() {
+    Preferences preferences;
+    preferences.begin("wifi_creds", true);
+    String ssid = preferences.getString("ssid", "");
+    String pass = preferences.getString("pass", "");
+    preferences.end();
+    
+    if (ssid == "") {
+        portENTER_CRITICAL(&serialMutex);
+        Serial.println("No WiFi credentials found. Entering BLE Provisioning mode.");
+        portEXIT_CRITICAL(&serialMutex);
+        return false;
+    }
+
     portENTER_CRITICAL(&serialMutex);
     Serial.print("Connecting to WiFi: ");
-    Serial.println(WIFI_SSID);
+    Serial.println(ssid);
     portEXIT_CRITICAL(&serialMutex);
 
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_8_5dBm); 
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    WiFi.begin(ssid.c_str(), pass.c_str());
     
-    while (WiFi.status() != WL_CONNECTED) {
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 10) {
         delay(500);
         Serial.print(".");
+        attempts++;
+    }
+    
+    if (WiFi.status() != WL_CONNECTED) {
+        portENTER_CRITICAL(&serialMutex);
+         Serial.println("\nWiFi connection failed! Entering BLE Provisioning mode.");
+         portEXIT_CRITICAL(&serialMutex);
+         return false;
     }
     
     portENTER_CRITICAL(&serialMutex);
@@ -49,6 +72,7 @@ void setupNetwork() {
     // KẾT NỐI QUA BẢO MẬT TLS
     espClient.setInsecure(); 
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+    return true;
 }
 
 void reconnectMQTT() {

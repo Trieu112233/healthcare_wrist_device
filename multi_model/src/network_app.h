@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-void setupNetwork();
+bool setupNetwork();
 void processMQTT();
 void publishAlert(float fallConf, float screamConf);
 
