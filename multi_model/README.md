@@ -9,7 +9,7 @@
 | **RAM** | 8MB PSRAM + 512KB SRAM |
 | **Chức năng chính** | Fall Detection + Scream Detection |
 | **Framework** | Arduino + PlatformIO |
-| **Kết nối** | WiFi 802.11b/g/n + MQTT |
+| **Kết nối** | WiFi 802.11b/g/n + BLE (Provisioning) + MQTT |
 
 ---
 
@@ -57,6 +57,7 @@
 | **sensors.cpp** | Đọc IMU & Microphone | C++ |
 | **ai_inference.cpp** | Chạy mô hình ML | C++ |
 | **network_app.cpp** | WiFi + MQTT | C++ |
+| **ble_provisioning.cpp**| Cấu hình mạng qua BLE | C++ |
 | **display_app.cpp** | Hiển thị LVGL | C++ |
 | **main.cpp** | FreeRTOS scheduler | C++ |
 
@@ -71,13 +72,13 @@
 - **Dữ liệu:** 6 trục (Acc X/Y/Z + Gyro X/Y/Z)
 - **Ring Buffer:** 200 mẫu = 4 giây liên tục
 - **Hiệu chỉnh:** Gyro bias calibration tự động
-- **Giao tiếp:** I2C (SDA: D4, SCL: D5)
+- **Giao tiếp:** I2C (SDA: D4, SCL: D5, INT1: D2)
 
 #### Microphone - INMP441
 - **Tần số lấy mẫu:** 16 kHz
 - **Độ phân giải:** 16-bit
 - **Buffer:** 16000 mẫu = 1 giây
-- **Giao tiếp:** I2S (SCK: D1, WS: D9, SD: D6)
+- **Giao tiếp:** I2S (WS: D9, SCK: D1, SD: D6)
 
 #### FreeRTOS Tasks
 ```c
@@ -124,6 +125,11 @@ if (hasAudioData) {
 
 ### 3. Kết Nối Mạng (Network)
 
+#### BLE Provisioning (Cấu hình WiFi)
+- Thay vì ghi cứng mật khẩu WiFi vào code, thiết bị phát Bluetooth LE (BLE).
+- Người dùng sử dụng ứng dụng di động để quét và điền thông tin WiFi.
+- Thông tin cấu hình được lưu vào Flash để tự động kết nối ở lần khởi động sau.
+
 #### WiFi Setup
 - **Mode:** Station (STA)
 - **TX Power:** -17 dBm (tiết kiệm năng lượng)
@@ -132,7 +138,7 @@ if (hasAudioData) {
 #### MQTT Configuration
 - **Server:** HiveMQ Cloud (Bảo mật TLS/SSL)
 - **Port:** 8883
-- **Topic:** Tùy định nghĩa (config.h)
+- **Topic:** wearable/xiao_esp32s3_01/alerts
 - **Payload:** JSON format
 ```json
 {
@@ -146,7 +152,8 @@ if (hasAudioData) {
 
 #### Hardware
 - **Display:** GC9A01 (240×240 pixel, circular)
-- **Giao tiếp:** Hardware SPI
+- **Giao tiếp:** Hardware SPI (SCK: D8, MOSI: D10, CS: D7, DC: D3)
+- **MISO & RST:** MISO không dùng (D9), RST nối cứng 3V3.
 - **Độ sáng:** Khả năng điều chỉnh (0-255)
 
 #### UI Framework
@@ -166,15 +173,16 @@ if (hasAudioData) {
 
 ### Setup Phase (Khởi động)
 1. Khởi tạo display (LVGL + GC9A01)
-2. Kết nối WiFi & đồng bộ thời gian NTP
-3. Cấp phát bộ nhớ cho buffers (PSRAM)
-4. Khởi tạo IMU & Microphone
-5. Hiệu chỉnh Gyro bias
-6. Khởi chạy FreeRTOS tasks
-7. Warm-up 4 giây
+2. Bật BLE Provisioning để lấy cấu hình kết nối WiFi
+3. Kết nối WiFi & đồng bộ thời gian NTP qua cấu hình đã lưu
+4. Cấp phát bộ nhớ cho buffers (PSRAM)
+5. Khởi tạo IMU & Microphone
+6. Hiệu chỉnh Gyro bias
+7. Khởi chạy FreeRTOS tasks
+8. Warm-up 4 giây
 
 ### Main Loop (Chạy liên tục)
-```
+```cpp
 loop() {
     lv_timer_handler();              // Cập nhật display
     processMQTT();                   // Duy trì MQTT
@@ -228,25 +236,42 @@ build_flags =
 
 ### config.h
 ```c
-// WiFi credentials
-#define WIFI_SSID "your_network"
-#define WIFI_PASS "your_password"
+#ifndef CONFIG_H
+#define CONFIG_H
 
-// MQTT (HiveMQ)
-#define MQTT_SERVER "your_hivemq_server.com"
-#define MQTT_PORT 8883
-#define MQTT_USER "mqtt_user"
-#define MQTT_PASS "mqtt_password"
+// --- THÔNG TIN WIFI ---
+// Nhận qua BLE Provisioning. Không hardcode.
 
-// Pins
-#define SDA_PIN D4      // IMU
-#define SCL_PIN D5
-#define I2S_SCK D1      // Mic
-#define I2S_WS D9
-#define I2S_SD D6
+// --- THÔNG TIN HIVEMQ CLOUD (Bảo mật TLS/SSL) ---
+#define MQTT_SERVER "08c8ad4b15ac4370b81835f72e145e5a.s1.eu.hivemq.cloud"
+#define MQTT_PORT   8883
+#define MQTT_USER   "esp32s3_client"
+#define MQTT_PASS   "Abcd13579!"
+#define MQTT_TOPIC_PUBLISH "wearable/xiao_esp32s3_01/alerts"
 
-// Alert threshold
-#define ALERT_THRESHOLD 0.80f  // 80% confidence
+// --- CẤU HÌNH PHẦN CỨNG & PIN ---
+// 1. IMU (I2C) LSM6DS3
+#define SDA_PIN         D4
+#define SCL_PIN         D5
+#define IMU_INT1_PIN    D2
+
+// 2. Microphone (I2S) INMP441
+#define I2S_WS  D9
+#define I2S_SCK D1
+#define I2S_SD  D6
+
+// 3. TFT Display GC9A01 (Hardware SPI)
+#define TFT_SCK   D8
+#define TFT_MOSI  D10
+#define TFT_MISO  -1
+#define TFT_CS    D7
+#define TFT_DC    D3
+#define TFT_RST   -1
+
+// --- NGƯỠNG CẢNH BÁO TỰ TIN CỦA AI ---
+#define ALERT_THRESHOLD 0.80f
+
+#endif
 ```
 ---
 
@@ -274,7 +299,7 @@ platformio device monitor -e seeed_xiao_esp32s3
 Firmware Multi-Model cung cấp:
 - ✅ **Xử lý real-time** trên edge device
 - ✅ **Tiêu thụ điện tối ưu** với deep sleep mode
-- ✅ **Kết nối đám mây** qua MQTT bảo mật
+- ✅ **Kết nối đám mây an toàn** qua MQTT TLS và cấu hình WiFi qua BLE Provisioning
 - ✅ **Giao diện trực quan** với LVGL animation
 - ✅ **Mở rộng dễ dàng** với modular architecture
 
