@@ -9,7 +9,7 @@
   - Được thực hiện bằng script `preprocess_edge_impulse.py` trong repo này.
   - Quá trình xử lý thực hiện chuẩn hóa tần số dữ liệu về 50Hz, cắt các phân đoạn ngắn gọn từng hoạt động, tự động gán nhãn `fall` (ngã) hoặc `normal` (bình thường) dựa trên dữ liệu hoặc nhãn có sẵn.
   - Kết quả là tập hợp các file .csv độc lập, mỗi file tương ứng với một phiên ghi hình, đã chia thành hai tập `training` và `testing` để đảm bảo kiểm thử công bằng, không trùng lặp người dùng giữa train và test.
-  Tập hợp các file trên được đặt ở trong thư mục WEDA-FALL-main/dataset/processed_individual.
+  Tập hợp các file trên được đặt ở trong thư mục `WEDA-FALL-main/dataset/processed_individual`.
 
 ## 2. Cấu hình Impulse trên Edge Impulse
 
@@ -54,16 +54,13 @@
 ## 5. Triển khai trên thiết bị thực tế
 
 - **Model output:** Đã lượng tử hóa sẵn (int8) để nhúng trên vi điều khiển.
-- **Tích hợp:** Hỗ trợ xuất model cho TensorFlow Lite Micro hoặc dùng trực tiếp với Edge Impulse firmware for ESP32-S3.
-- **Khả năng thực tế:** Theo thử nghiệm, tốc độ, độ chính xác tương đương với trên Edge Impulse khi áp dụng trên dữ liệu thực thu từ thiết bị.
+- **Tích hợp:** Hỗ trợ xuất thư viện C++ cho TensorFlow Lite Micro.
 
 ## 6. Tài liệu tham khảo
 
 - WEDA-FALL Dataset: https://github.com/joaojtmarques/WEDA-FALL  
 - Tiền xử lý: `dataset/WEDA-FALL-main/preprocess_edge_impulse.py`  
 - Dữ liệu sau xử lý: `dataset/WEDA-FALL-main/dataset/processed_individual`  
-- Code huấn luyện mô hình: xem phần cơ chế `Neural network architecture` trong tài liệu này hoặc trong Edge Impulse project.
+- Code huấn luyện mô hình: xem phần cơ chế `Neural network architecture` trong Edge Impulse project (https://studio.edgeimpulse.com/public/868007/live).
 
 ---
-
-**Ghi chú:** Nếu cần update thêm các thông số riêng của bộ dữ liệu hoặc thay đổi cấu hình impulse/model, vui lòng cập nhật lại README này cho phù hợp thực tế.
