@@ -53,8 +53,9 @@
 
 ## 5. Triển khai trên thiết bị thực tế
 
-- **Model output:** Đã lượng tử hóa sẵn (int8) để nhúng trên vi điều khiển.
-- **Tích hợp:** Hỗ trợ xuất thư viện C++ cho TensorFlow Lite Micro.
+- **Target:** Mô hình xuất ra dưới dạng C++ library, hoàn toàn độc lập, có thể tích hợp trực tiếp vào chương trình nhúng, phù hợp mọi bộ biên dịch C++ hiện đại.
+- **Inference engine:** EON Compiler – tối ưu hiệu năng, giảm ~40% RAM, ~33% flash so với giải pháp thông thường.
+- **Hỗ trợ:** Có thể chạy tốt trên các vi điều khiển như ESP32-S3 và các hệ thống nhúng khác.
 
 ## 6. Tài liệu tham khảo
 
