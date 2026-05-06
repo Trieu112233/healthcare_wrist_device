@@ -6,7 +6,7 @@ Dự án này hiện thực việc nhận diện đồng thời hai hiện tư�
 - **Phát hiện ngã (Fall Detection)**
 - **Phát hiện tiếng la (Scream Detection)**
 
-Mỗi mô hình được xây dựng, huấn luyện và đánh giá độc lập trên Edge Impulse (sử dụng dữ liệu riêng, pipeline đặc thù cho từng nhiệm vụ). Yêu cầu của hệ thống là phải triển khai song song nhiều mô hình trên cùng một thiết bị nhúng (ví dụ: XIAO ESP32-S3) với hiệu năng tối ưu và bộ nhớ hạn chế.
+Mỗi mô hình được xây dựng, huấn luyện và đánh giá độc lập trên Edge Impulse (sử dụng dữ liệu riêng, pipeline đặc thù cho từng nhiệm vụ). Yêu cầu của hệ thống là phải triển khai song song hai mô hình trên cùng một thiết bị nhúng XIAO ESP32-S3 với hiệu năng tối ưu và bộ nhớ hạn chế.
 
 ## Giải pháp hợp nhất mô hình
 
@@ -19,16 +19,16 @@ Kiến trúc này cho phép:
 
 ## Cách tổ chức và cấu trúc
 
-1. **Mỗi mô hình AI** được phát triển, đánh giá, xuất khẩu C++ library riêng biệt từ Edge Impulse.
+1. **Mỗi mô hình AI** được phát triển, đánh giá, xuất ra C++ library riêng biệt từ Edge Impulse.
 2. **Hợp nhất mô hình**:  
-    Hai (hoặc nhiều) thư viện C++ được tổ chức lại trong cấu trúc chuẩn theo khung của Edge Impulse Multi-Impulse.  
+    Hai thư viện C++ được tổ chức lại trong cấu trúc chuẩn theo khung của Edge Impulse Multi-Impulse.  
     Hệ thống tạo một bộ API duy nhất cho phép gọi từng mô hình theo tên/class đã đăng ký.
 3. **Nội dung thư viện hợp nhất**:
     - Chứa toàn bộ mã nguồn, weight, tham số của từng mô hình.
     - Giữ namespace riêng biệt, không xung đột tài nguyên/hàm.
     - Có cấu hình định tuyến input (audio chuyển về scream, imu chuyển về fall...).
 4. **Triển khai**:  
-    Bộ thư viện cuối cùng được nạp lên vi điều khiển, có thể sử dụng trực tiếp trên Arduino IDE hoặc hệ thống nhúng C++ bất kỳ.
+    Bộ thư viện cuối cùng được nạp lên vi điều khiển bằng nền tảng Platform IO.
 
 ## Quy trình tổng quát
 
