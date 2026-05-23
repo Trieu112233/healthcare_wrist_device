@@ -1,127 +1,91 @@
 #include "ble_provisioning.h"
-#include <ArduinoBLE.h>
+#include "display_app.h"
 #include <WiFi.h>
-#include <ArduinoJson.h>
+#include <WiFiProv.h>
 #include <Preferences.h>
 
-Preferences preferences;
+static const char* BLE_POP_CODE    = "12345678"; 
+static const char* BLE_SERVICE_NAME = "ESP32S3_01";
+static const char* BLE_SERVICE_KEY  = NULL;
 
-// Services and Characteristics
-BLEService scanService("12345678-1234-5678-1234-567812345678");
-BLEStringCharacteristic wifiListChar("12345678-1234-5678-1234-567812345678", BLERead, 512);
+static void SysProvEvent(arduino_event_t *sys_event) {
+    switch (sys_event->event_id) {
+        case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+            Serial.printf("\n[BLE Prov] Đã kết nối, IP: %s\n", IPAddress(sys_event->event_info.got_ip.ip_info.ip.addr).toString().c_str());
+            update_ble_status_label("Connected!");
+            break;
 
-BLEService provService("87654321-4321-8765-4321-876543218765");
-BLEStringCharacteristic ssidChar("87654321-4321-8765-4321-876543218761", BLEWrite, 64);
-BLEStringCharacteristic passChar("87654321-4321-8765-4321-876543218762", BLEWrite, 64);
-BLEStringCharacteristic statusChar("87654321-4321-8765-4321-876543218763", BLENotify, 32);
+        case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+            Serial.println("[BLE Prov] Mất kết nối. Đang thử lại...");
+            break;
 
-String receivedSSID = "";
-String receivedPass = "";
-unsigned long bleStartTime = 0;
-bool provisioningMode = false;
+        case ARDUINO_EVENT_PROV_START:
+            Serial.println("\n[BLE Prov] Bắt đầu Provisioning. Vui lòng nhập thông tin WiFi qua app smartphone.");
+            update_ble_status_label("Provisioning...");
+            break;
 
-extern portMUX_TYPE serialMutex;
-
-void handleBLEWrite(BLEDevice central, BLECharacteristic characteristic) {
-    if (characteristic.uuid() == ssidChar.uuid()) {
-        receivedSSID = ssidChar.value();
-        Serial.print("Received SSID: ");
-        Serial.println(receivedSSID);
-    } else if (characteristic.uuid() == passChar.uuid()) {
-        receivedPass = passChar.value();
-        Serial.print("Received Password!");
-    }
-    
-    if (receivedSSID.length() > 0 && receivedPass.length() > 0) {
-        updateBLEStatus("connecting");
-        
-        Serial.println("Attempting WiFi connect...");
-        WiFi.begin(receivedSSID.c_str(), receivedPass.c_str());
-        
-        int attempts = 0;
-        while (WiFi.status() != WL_CONNECTED && attempts < 10) {
-            delay(500);
-            attempts++;
-        }
-        
-        if (WiFi.status() == WL_CONNECTED) {
-            updateBLEStatus("connected");
+        case ARDUINO_EVENT_PROV_CRED_RECV: {
+            const char* ssid = (const char*)sys_event->event_info.prov_cred_recv.ssid;
+            const char* pass = (const char*)sys_event->event_info.prov_cred_recv.password;
             
-            // Save credentials
+            Serial.printf("\n[BLE Prov] Đã nhận thông tin: SSID = %s\n", ssid);
+            
+            // Store WiFi credentials in NVS so normal boot can skip provisioning.
+            Preferences preferences;
             preferences.begin("wifi_creds", false);
-            preferences.putString("ssid", receivedSSID);
-            preferences.putString("pass", receivedPass);
+            preferences.putString("ssid", ssid);
+            preferences.putString("pass", pass);
             preferences.end();
-            
-            Serial.println("WiFi configured via BLE and saved!");
-            delay(2000); // Allow time for client to get status
-            ESP.restart(); // Restart to normal mode
-        } else {
-            updateBLEStatus("failed");
-            receivedSSID = "";
-            receivedPass = "";
+
+            update_ble_status_label("Connecting...");
+            break;
         }
+
+        case ARDUINO_EVENT_PROV_CRED_FAIL: {
+            Serial.println("\n[BLE Prov] Provisioning thất bại!");
+            if (sys_event->event_info.prov_fail_reason == WIFI_PROV_STA_AUTH_ERROR) {
+                Serial.println("[BLE Prov] Lỗi: Sai mật khẩu WiFi.");
+                update_ble_status_label("Wrong Pass");
+            } else {
+                Serial.println("[BLE Prov] Lỗi: Không tìm thấy Access Point.");
+                update_ble_status_label("AP not found");
+            }
+            break;
+        }
+
+        case ARDUINO_EVENT_PROV_CRED_SUCCESS:
+            Serial.println("\n[BLE Prov] Provisioning thành công!");
+            update_ble_status_label("Success!");
+            break;
+
+        case ARDUINO_EVENT_PROV_END:
+            Serial.println("\n[BLE Prov] Kết thúc quá trình Provisioning. Đang khởi động lại...");
+            delay(500);
+            ESP.restart();
+            break;
+
+        default:
+            break;
     }
 }
 
-void updateBLEStatus(String status) {
-    statusChar.writeValue(status);
+void setupBLEProvisioning() {
+    Serial.println("[BLE Prov] Khởi động chế độ chờ BLE Provisioning...");
+    
+    WiFi.onEvent(SysProvEvent);
+    update_ble_status_label("BLE Provisioning");
+
+    WiFiProv.beginProvision(
+        WIFI_PROV_SCHEME_BLE, 
+        WIFI_PROV_SCHEME_HANDLER_FREE_BTDM,
+        WIFI_PROV_SECURITY_1, 
+        BLE_POP_CODE, 
+        BLE_SERVICE_NAME, 
+        BLE_SERVICE_KEY, 
+        NULL, 
+        true
+    );
 }
 
-void setupBLE() {
-    if (!BLE.begin()) {
-        Serial.println("starting Bluetooth® Low Energy module failed!");
-        return;
-    }
-
-    BLE.setLocalName("ESP32-S3-HealthWatch");
-    BLE.setAdvertisedService(provService);
-
-    // Add characteristics to services
-    scanService.addCharacteristic(wifiListChar);
-    
-    provService.addCharacteristic(ssidChar);
-    provService.addCharacteristic(passChar);
-    provService.addCharacteristic(statusChar);
-
-    // Add services
-    BLE.addService(scanService);
-    BLE.addService(provService);
-
-    // Callbacks
-    ssidChar.setEventHandler(BLEWritten, handleBLEWrite);
-    passChar.setEventHandler(BLEWritten, handleBLEWrite);
-
-    // Scan for WiFi networks and format as JSON
-    Serial.println("Scanning WiFi networks...");
-    int n = WiFi.scanNetworks();
-    StaticJsonDocument<1024> doc;
-    JsonArray array = doc.to<JsonArray>();
-    
-    for (int i = 0; i < n; ++i) {
-        array.add(WiFi.SSID(i));
-    }
-    String jsonStr;
-    serializeJson(doc, jsonStr);
-    wifiListChar.writeValue(jsonStr);
-
-    updateBLEStatus("provisioning");
-    
-    BLE.advertise();
-    Serial.println("BLE advertising started. Waiting for connection...");
-    
-    bleStartTime = millis();
-    provisioningMode = true;
-}
-
-void checkBLEProvisioning() {
-    if (!provisioningMode) return;
-    
-    BLE.poll();
-    
-    // Timeout logic - 5 minutes (300000 ms)
-    if (millis() - bleStartTime > 300000) {
-        Serial.println("BLE Provisioning timeout (5 mins). Restarting...");
-        ESP.restart();
-    }
+void loopBLEProvisioning() {
 }

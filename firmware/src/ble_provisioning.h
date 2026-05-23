@@ -3,11 +3,8 @@
 
 #include <Arduino.h>
 
-extern bool provisioningMode;
+void setupBLEProvisioning();
+void loopBLEProvisioning();
 
-void setupBLE();
-void updateBLEStatus(String status);
-void checkBLEProvisioning();
-
-#endif
+#endif // BLE_PROVISIONING_H
 

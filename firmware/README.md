@@ -72,7 +72,7 @@
 - **Dữ liệu:** 6 trục (Acc X/Y/Z + Gyro X/Y/Z)
 - **Ring Buffer:** 200 mẫu = 4 giây liên tục
 - **Hiệu chỉnh:** Gyro bias calibration tự động
-- **Giao tiếp:** I2C (SDA: D4, SCL: D5, INT1: D2)
+- **Giao tiếp:** I2C (SDA: D5, SCL: D4, INT1: D2)
 
 #### Microphone - INMP441
 - **Tần số lấy mẫu:** 16 kHz
@@ -83,10 +83,10 @@
 #### FreeRTOS Tasks
 ```c
 // Task IMU chạy trên Core 0
-xTaskCreatePinnedToCore(imuTask, "IMU_Task", 4096, NULL, 2, NULL, 0);
+xTaskCreatePinnedToCore(imuTask, "IMU_Task", 4096, NULL, 4, NULL, 0);
 
 // Task Mic chạy trên Core 1
-xTaskCreatePinnedToCore(micTask, "Mic_Task", 8192, NULL, 2, NULL, 1);
+xTaskCreatePinnedToCore(micTask, "Mic_Task", 8192, NULL, 3, NULL, 1);
 ```
 
 ### 2. Suy Luận Máy Học (AI Inference)
@@ -192,7 +192,7 @@ loop() {
         lastMotionTime = millis();   // Reset inactivity
     }
     
-    if (millis() - lastMotionTime > 10s) {
+    if (millis() - lastMotionTime > 20s) {
         goToDeepSleep();             // Vào deep sleep nếu không có chuyển động
     }
     
@@ -205,7 +205,7 @@ loop() {
 ```
 
 ### Deep Sleep Mode
-- **Trigger:** 10 giây không có chuyển động
+- **Trigger:** 20 giây không có chuyển động
 - **Công suất:** ~100 μA
 - **Wake-up:** Motion từ IMU interrupt
 - **RTC Storage:** Lưu Gyro bias qua sleep
@@ -239,20 +239,17 @@ build_flags =
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// --- THÔNG TIN WIFI ---
-// Nhận qua BLE Provisioning. Không hardcode.
-
-// --- THÔNG TIN HIVEMQ CLOUD (Bảo mật TLS/SSL) ---
+// WiFi credentials are stored by BLE provisioning, not hardcoded in firmware.
 #define MQTT_SERVER "08c8ad4b15ac4370b81835f72e145e5a.s1.eu.hivemq.cloud"
 #define MQTT_PORT   8883
 #define MQTT_USER   "esp32s3_client"
 #define MQTT_PASS   "Abcd13579!"
+
 #define MQTT_TOPIC_PUBLISH "wearable/xiao_esp32s3_01/alerts"
 
-// --- CẤU HÌNH PHẦN CỨNG & PIN ---
-// 1. IMU (I2C) LSM6DS3
-#define SDA_PIN         D4
-#define SCL_PIN         D5
+// Hardware pins
+#define SDA_PIN         D5
+#define SCL_PIN         D4
 #define IMU_INT1_PIN    D2
 
 // 2. Microphone (I2S) INMP441
@@ -268,7 +265,6 @@ build_flags =
 #define TFT_DC    D3
 #define TFT_RST   -1
 
-// --- NGƯỠNG CẢNH BÁO TỰ TIN CỦA AI ---
 #define ALERT_THRESHOLD 0.80f
 
 #endif

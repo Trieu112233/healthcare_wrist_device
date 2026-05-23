@@ -7,35 +7,30 @@
 #include "driver/rtc_io.h"
 #include "display_app.h"
 
-// ===== IMU CONFIGURATION =====
 LSM6DS3 myIMU(I2C_MODE, 0x6B);
 
-// Biến lưu trữ Gyro Bias để hiệu chỉnh (song qua deepsleep)
 RTC_DATA_ATTR float gyroBiasX = 0;
 RTC_DATA_ATTR float gyroBiasY = 0;
 RTC_DATA_ATTR float gyroBiasZ = 0;
 RTC_DATA_ATTR bool isCalibrated = false;
 
-// Các biến phục vụ Ring Buffer
 float* imuBuffer = NULL;
 volatile int imu_head = 0;
 
-// ===== AUDIO CONFIGURATION =====
 #define I2S_PORT I2S_NUM_0
 int16_t* audioBuffer = NULL;
 
-// ===== SYNCHRONIZATION =====
 portMUX_TYPE serialMutex = portMUX_INITIALIZER_UNLOCKED;
 portMUX_TYPE dataReadyMutex = portMUX_INITIALIZER_UNLOCKED;
 
-// Khai báo thực thể của 2 biến handle đã extern ở sensors.h
 TaskHandle_t imuTaskHandle = NULL;
 TaskHandle_t micTaskHandle = NULL;
 
-bool audioDataReady = false;
+volatile bool audioDataReady = false;
 
-// ========== THUẬT TOÁN I2S ==========
 void setupI2S() {
+    updateStatusUI("I2S: starting");
+
     i2s_config_t i2s_config = {
         .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
         .sample_rate = AUDIO_SAMPLE_RATE,
@@ -57,39 +52,51 @@ void setupI2S() {
         .data_in_num = I2S_SD
     };
 
-    i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
-    i2s_set_pin(I2S_PORT, &pin_config);
-}
+    esp_err_t installResult = i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
+    esp_err_t pinResult = i2s_set_pin(I2S_PORT, &pin_config);
 
-// ========== THUẬT TOÁN IMU ==========
-void setupIMU() {
-    Wire.begin(SDA_PIN, SCL_PIN);
-    if (myIMU.begin() != 0) {
+    if (installResult != ESP_OK || pinResult != ESP_OK) {
         portENTER_CRITICAL(&serialMutex);
-        Serial.println("❌ ERROR: IMU not found!");
+        Serial.printf("[I2S] ERROR: install=%d pin=%d\n", installResult, pinResult);
         portEXIT_CRITICAL(&serialMutex);
+        updateStatusUI("I2S: failed");
         while(1) delay(100);
     }
 
-    // 1. KIỂM TRA LÝ DO KHỞI ĐỘNG
+    updateStatusUI("I2S: ready");
+}
+
+void setupIMU() {
+    updateStatusUI("IMU: starting");
+    Wire.end();
+    delay(10);
+    Wire.begin(SDA_PIN, SCL_PIN);
+    if (myIMU.begin() != 0) {
+        portENTER_CRITICAL(&serialMutex);
+        Serial.println("[IMU] ERROR: IMU not found!");
+        portEXIT_CRITICAL(&serialMutex);
+        updateStatusUI("IMU: failed");
+        while(1) delay(100);
+    }
+
     if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
         portENTER_CRITICAL(&serialMutex);
-        Serial.println("🚀 ĐÃ THỨC DẬY do có chuyển động!");
+        Serial.println("[IMU] Wakeup by motion interrupt.");
         portEXIT_CRITICAL(&serialMutex);
     } else {
         portENTER_CRITICAL(&serialMutex);
-        Serial.println("🔌 Cấp nguồn lần đầu (Cold Boot). Bắt buộc Calib!");
+        Serial.println("[IMU] Cold boot. Gyro calibration required.");
         portEXIT_CRITICAL(&serialMutex);
         isCalibrated = false; 
     }
 
-    // 2. CHẠY THUẬT TOÁN CALIB NẾU CHƯA CÓ
     if (!isCalibrated) {
         portENTER_CRITICAL(&serialMutex);
         Serial.println("Calibrating Gyro in 3s...");
         portEXIT_CRITICAL(&serialMutex);
+        updateStatusUI("Gyro: calibrating");
         
-        delay(3000); // Chờ 3 giây để ổn định
+        delay(3000);
         
         int numSamples = 200;
         gyroBiasX = 0; gyroBiasY = 0; gyroBiasZ = 0;
@@ -112,16 +119,18 @@ void setupIMU() {
         Serial.print(gyroBiasY); Serial.print(", ");
         Serial.println(gyroBiasZ);
         portEXIT_CRITICAL(&serialMutex);
+        updateStatusUI("Gyro: calibrated");
     } else {
         portENTER_CRITICAL(&serialMutex);
-        Serial.printf("Bỏ qua Calib. Dùng lại sai số cũ: X=%.2f, Y=%.2f, Z=%.2f\n", gyroBiasX, gyroBiasY, gyroBiasZ);
+        Serial.printf("Using retained gyro bias: X=%.2f, Y=%.2f, Z=%.2f\n", gyroBiasX, gyroBiasY, gyroBiasZ);
         portEXIT_CRITICAL(&serialMutex);
+        updateStatusUI("Gyro: retained");
     }
     
     delay(1000);
+    updateStatusUI("IMU: ready");
 }
 
-// ========== TASK MIC ==========
 void micTask(void *pvParameters) {
     int32_t raw_buf[256];
     size_t bytes_read;
@@ -134,7 +143,7 @@ void micTask(void *pvParameters) {
             if (result == ESP_OK && bytes_read > 0) {
                 int samples_read = bytes_read / sizeof(int32_t);
                 for (int i = 0; i < samples_read && samples_captured < AUDIO_SAMPLES_PER_CYCLE; i++) {
-                    audioBuffer[samples_captured] = (int16_t)(raw_buf[i] >> 14);
+                    audioBuffer[samples_captured] = (int16_t)(raw_buf[i] >> 16);
                     samples_captured++;
                 }
             }
@@ -146,19 +155,20 @@ void micTask(void *pvParameters) {
         portEXIT_CRITICAL(&dataReadyMutex);
 
         portENTER_CRITICAL(&serialMutex);
-        Serial.println("[MIC] ✓ Audio buffer ready");
+        Serial.println("[MIC] Audio buffer ready");
         portEXIT_CRITICAL(&serialMutex);
 
-        // Chờ Main Loop xử lý xong rồi thu chu kỳ mới
+        // Single-buffer mode: keep the audio window stable while AI consumes it.
         while (audioDataReady) {
             vTaskDelay(10 / portTICK_PERIOD_MS);
         }
     }
 }
 
-// ========== TASK IMU ==========
 void imuTask(void *pvParameters) {
     while (1) {
+        // SparkFun LSM6DS3 returns acceleration in g and gyro in deg/s.
+        // The fall model uses acceleration in m/s^2 and angular velocity in rad/s.
         float ax = myIMU.readFloatAccelX() * 9.81f;
         float ay = myIMU.readFloatAccelY() * 9.81f;
         float az = myIMU.readFloatAccelZ() * 9.81f;
@@ -167,6 +177,7 @@ void imuTask(void *pvParameters) {
         float gy = (myIMU.readFloatGyroY() - gyroBiasY) * (3.14159265f / 180.0f);
         float gz = (myIMU.readFloatGyroZ() - gyroBiasZ) * (3.14159265f / 180.0f);
         
+        portENTER_CRITICAL(&dataReadyMutex);
         imuBuffer[imu_head * 6 + 0] = ax;
         imuBuffer[imu_head * 6 + 1] = ay;
         imuBuffer[imu_head * 6 + 2] = az;
@@ -174,15 +185,16 @@ void imuTask(void *pvParameters) {
         imuBuffer[imu_head * 6 + 4] = gy;
         imuBuffer[imu_head * 6 + 5] = gz;
 
-        // Trượt
         imu_head = (imu_head + 1) % IMU_TOTAL_SAMPLES;
+        portEXIT_CRITICAL(&dataReadyMutex);
 
-        vTaskDelay(20 / portTICK_PERIOD_MS);  // 50 Hz (20ms)
+        vTaskDelay(20 / portTICK_PERIOD_MS);
     }
 }
 
-// ========== HÀM BỌC NGOÀI ==========
 void allocateSensorBuffers() {
+    updateStatusUI("Memory: allocating");
+
     size_t audioBufSize = AUDIO_SAMPLES_PER_CYCLE * sizeof(int16_t);
     audioBuffer = (int16_t*)heap_caps_malloc(audioBufSize, MALLOC_CAP_SPIRAM);
     if (!audioBuffer) audioBuffer = (int16_t*)malloc(audioBufSize);
@@ -193,8 +205,9 @@ void allocateSensorBuffers() {
 
     if (!audioBuffer || !imuBuffer) {
         portENTER_CRITICAL(&serialMutex);
-        Serial.println("❌ CRITICAL: Memory allocation failed!");
+        Serial.println("[MEMORY] CRITICAL: buffer allocation failed!");
         portEXIT_CRITICAL(&serialMutex);
+        updateStatusUI("Memory: failed");
         while(1);
     }
     
@@ -206,6 +219,7 @@ void allocateSensorBuffers() {
         Serial.printf("[MEMORY] Total PSRAM currently used: %u bytes\n", psramUsed);
     }
     portEXIT_CRITICAL(&serialMutex);
+    updateStatusUI("Memory: ready");
 }
 
 void setupSensors() {
@@ -214,8 +228,19 @@ void setupSensors() {
 }
 
 void startSensorTasks() {
-    xTaskCreatePinnedToCore(micTask, "Mic_Task", 8192, NULL, 2, &micTaskHandle, 1);
-    xTaskCreatePinnedToCore(imuTask, "IMU_Task", 4096, NULL, 2, &imuTaskHandle, 0);
+    // Keep IMU sampling isolated from AI/UI load to prioritize fall detection.
+    BaseType_t imuTaskResult = xTaskCreatePinnedToCore(imuTask, "IMU_Task", 4096, NULL, 4, &imuTaskHandle, 0);
+    BaseType_t micTaskResult = xTaskCreatePinnedToCore(micTask, "Mic_Task", 8192, NULL, 3, &micTaskHandle, 1);
+
+    if (imuTaskResult != pdPASS || micTaskResult != pdPASS) {
+        portENTER_CRITICAL(&serialMutex);
+        Serial.printf("[TASK] ERROR: IMU=%d MIC=%d\n", imuTaskResult, micTaskResult);
+        portEXIT_CRITICAL(&serialMutex);
+        updateStatusUI("Tasks: failed");
+        while(1) delay(100);
+    }
+
+    updateStatusUI("Tasks: ready");
 }
 
 void goToDeepSleep() {
@@ -223,7 +248,14 @@ void goToDeepSleep() {
     Serial.println("Entering deep sleep mode...");
     portEXIT_CRITICAL(&serialMutex);
 
-    // 1. Ghi cấu hình WakeUp vào cảm biến qua I2C
+    if (imuTaskHandle != NULL) {
+        vTaskSuspend(imuTaskHandle);
+    }
+    if (micTaskHandle != NULL) {
+        vTaskSuspend(micTaskHandle);
+    }
+
+    // Configure LSM6DS3 motion interrupt as the deep-sleep wake source.
     Wire.beginTransmission(0x6B); Wire.write(0x10); Wire.write(0x60); Wire.endTransmission();
     Wire.beginTransmission(0x6B); Wire.write(0x58); Wire.write(0x80); Wire.endTransmission();
     Wire.beginTransmission(0x6B); Wire.write(0x5C); Wire.write(0x00); Wire.endTransmission();
@@ -232,7 +264,6 @@ void goToDeepSleep() {
 
     delay(100); 
 
-    // 2. Chốt xóa cờ Interrupt cũ (Hạ mức INT1 xuống thấp)
     Wire.beginTransmission(0x6B);
     Wire.write(0x1B);
     Wire.endTransmission(false);
@@ -240,16 +271,13 @@ void goToDeepSleep() {
     if (Wire.available()) {
         Wire.read(); 
     }
-    // 3. Cấu hình chân phần cứng để nhận ngắt từ IMU
     rtc_gpio_pulldown_en((gpio_num_t)IMU_INT1_PIN);
     rtc_gpio_pullup_dis((gpio_num_t)IMU_INT1_PIN);
     esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT1_PIN, 1);
 
-    // ngat audio va man hinh
     sleepDisplay();
     i2s_driver_uninstall(I2S_PORT);
 
-    // xa serial, bat dau ngu
     Serial.flush();
     esp_deep_sleep_start();
 }

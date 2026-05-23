@@ -1,95 +1,80 @@
 #include <Arduino.h>
+#include <lvgl.h>
 
-/*
- * FIRMWARE: MULTI-MODEL SEQUENTIAL INFERENCE
- * Fall Detection (IMU 4s Ring Buffer) + Scream Detection (Audio 1s)
- * Board: Seeed Studio XIAO ESP32-S3
- */
-
-// ===== MODULE INCLUDES =====
 #include "../include/config.h"
 #include "network_app.h"
 #include "sensors.h"
 #include "ai_inference.h"
 #include "display_app.h"
 #include "ble_provisioning.h"
-#include <lvgl.h> 
 
-unsigned long lastMotionTime = 0;
-unsigned long lastTimeUpdate = 0;
-const unsigned long SLEEP_TIMEOUT = 10000;
+static unsigned long lastMotionTime = 0;
+static unsigned long lastTimeUpdate = 0;
+static const unsigned long SLEEP_TIMEOUT = 20000;
+static const float MOTION_THRESHOLD = 0.15f;
 
-// ========== SETUP ==========
 void setup() {
     Serial.begin(115200);
     delay(100);
 
     setupDisplay();
-    for(int i=0; i<10; i++) { lv_timer_handler(); delay(5); }
+    for (int i = 0; i < 10; i++) { 
+        lv_timer_handler(); 
+        delay(5); 
+    }
 
     portENTER_CRITICAL(&serialMutex);
-    Serial.println("\n╔═════════════════════════════════════╗");
-    Serial.println("║  ESP32-S3 MULTI-MODEL SYSTEM       ║");
-    Serial.println("║  Fall + Scream Detection           ║");
-    Serial.println("═════════════════════════════════════");
+    Serial.println("\n=====================================");
+    Serial.println("ESP32-S3 MULTI-MODEL SYSTEM");
+    Serial.println("Fall + Scream Detection");
+    Serial.println("=====================================");
     portEXIT_CRITICAL(&serialMutex);
 
-    // 2. KẾT NỐI MẠNG & THỜI GIAN (Blocking)
+    updateStatusUI("Network: starting");
     if (!setupNetwork()) {
-        setupBLE();
-    } else {
-        // 3. CẬP NHẬT GIỜ LÊN MÀN HÌNH (Lúc này có mạng -> Hiện giờ, đổi chữ thành "SAFE")
-        updateTimeUI();
-        for(int i=0; i<10; i++) { lv_timer_handler(); delay(5); } // Kịp render giờ và đổi chữ
-
-
-        // 2. Cấp phát vùng nhớ, Khởi tạo MCU I2S, I2C/IMU
-        allocateSensorBuffers();
-        setupSensors();
-
-        portENTER_CRITICAL(&serialMutex);
-        Serial.println("\n[INIT] Starting FreeRTOS tasks...");
-        portEXIT_CRITICAL(&serialMutex);
-        
-        // 3. Kích hoạt FreeRTOS Tasks
-        startSensorTasks();
-
-        portENTER_CRITICAL(&serialMutex);
-        Serial.println("\nSYSTEM READY");
-        Serial.println("  Waiting 4s for IMU buffer warm-up...\n");
-        portEXIT_CRITICAL(&serialMutex);
-
-        // 5. WARM-UP 4 GIÂY (Cho phép màn hình vẫn chạy animation)
-        unsigned long start_warmup = millis();
-        while (millis() - start_warmup < 4000) {
-            lv_timer_handler(); // Giữ cho màn hình không bị đơ
-            delay(10);
+        setupBLEProvisioning();
+        while (1) {
+            lv_timer_handler();
+            delay(5);
         }
+    } 
+    
+    updateTimeUI();
+    for (int i = 0; i < 10; i++) { 
+        lv_timer_handler(); 
+        delay(5); 
     }
 
-    lastMotionTime = millis(); // Reset lại đồng hồ đếm thời gian sau khi IMU đã ổn định
+    updateStatusUI("Sensors: starting");
+    allocateSensorBuffers();
+    setupSensors();
+
+    portENTER_CRITICAL(&serialMutex);
+    Serial.println("\n[INIT] Bắt đầu khởi động các tác vụ FreeRTOS...");
+    portEXIT_CRITICAL(&serialMutex);
+    
+    updateStatusUI("Tasks: starting");
+    startSensorTasks();
+
+    portENTER_CRITICAL(&serialMutex);
+    Serial.println("[INIT] HỆ THỐNG SẴN SÀNG!");
+    Serial.println("[INIT] Chờ 4s để khởi động buffer bộ đệm IMU...\n");
+    portEXIT_CRITICAL(&serialMutex);
+
+    updateStatusUI("IMU warm-up");
+    // Warm up the IMU ring buffer before enabling inference and sleep checks.
+    unsigned long start_warmup = millis();
+    while (millis() - start_warmup < 4000) {
+        lv_timer_handler(); 
+        delay(10);
+    }
+
+    lastMotionTime = millis();
+    updateStatusUI("SAFE");
 }
 
-
-// ========== MAIN LOOP ==========
 void loop() {
-    // --- BỔ SUNG CHO MÀN HÌNH LVGL ---
-    lv_timer_handler(); // Hàm xử lý công việc hiển thị (vẽ, update text, animation...)
-    // ---------------------------------
-
-    if (provisioningMode) {
-        checkBLEProvisioning();
-        return; // Don't run AI tasks during provisioning
-    }
-
-    bool hasAudioData = false;
-
-    // Xem liệu Mic đã thu đủ 1s audio chưa
-    portENTER_CRITICAL(&dataReadyMutex);
-    hasAudioData = audioDataReady;
-    portEXIT_CRITICAL(&dataReadyMutex);
-
-    // Duy trì Client MQTT
+    lv_timer_handler();
     processMQTT();
 
     if (millis() - lastTimeUpdate > 1000) {
@@ -97,38 +82,47 @@ void loop() {
         lastTimeUpdate = millis();
     }
 
-    int currentHead = imu_head;
+    int currentHead;
+    float ax = 0.0f;
+    float ay = 0.0f;
+    float az = 0.0f;
+
+    portENTER_CRITICAL(&dataReadyMutex);
+    currentHead = imu_head;
     if (currentHead >= 0) {
         int last_idx = (currentHead == 0) ? IMU_TOTAL_SAMPLES - 1 : currentHead - 1;
-        float ax = imuBuffer[last_idx * 6 + 0];
-        float ay = imuBuffer[last_idx * 6 + 1];
-        float az = imuBuffer[last_idx * 6 + 2];
-        
-        // Tính tổng gia tốc Acc = sqrt(ax^2 + ay^2 + az^2)
+        ax = imuBuffer[last_idx * 6 + 0];
+        ay = imuBuffer[last_idx * 6 + 1];
+        az = imuBuffer[last_idx * 6 + 2];
+    }
+    portEXIT_CRITICAL(&dataReadyMutex);
+
+    if (currentHead >= 0) {
         float totalAcc = sqrt(ax*ax + ay*ay + az*az);
         float totalG = totalAcc / 9.81f;
-        float delta = abs(totalG - 1.0f); 
+        float delta = abs(totalG - 1.0f);
         
-        // Kiem tra nguong
-        if (delta > 0.15f) {
-            lastMotionTime = millis(); // Có rung lắc -> Cập nhật lại
+        if (delta > MOTION_THRESHOLD) {
+            lastMotionTime = millis();
         }
     }
 
-    // ĐÃ QUÁ timeout MÀ KHÔNG AI CỬ ĐỘNG -> ĐI NGỦ
     if (millis() - lastMotionTime > SLEEP_TIMEOUT) {
         goToDeepSleep();
     }
 
-    // Đồng bộ kích hoạt suy luận theo 1s
+    bool hasAudioData = false;
+    portENTER_CRITICAL(&dataReadyMutex);
+    hasAudioData = audioDataReady;
+    portEXIT_CRITICAL(&dataReadyMutex);
+
     if (hasAudioData) {
         run_ai_inference();
 
-        // reset flag
         portENTER_CRITICAL(&dataReadyMutex);
         audioDataReady = false;
         portEXIT_CRITICAL(&dataReadyMutex);
     }
 
-    delay(10); 
+    delay(10);
 }
