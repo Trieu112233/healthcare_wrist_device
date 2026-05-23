@@ -69,10 +69,10 @@ firmware/
 
 Firmware include các model trong `lib/deploy/model-parameters/model_variables.h` và `lib/deploy/tflite-model/`.
 
-| Model | Project | Handle | Input | Label |
-| --- | --- | --- | --- | --- |
-| Fall Detection | `868007`, deploy version `7` | `impulse_handle_868007_1` | 200 mẫu IMU, 6 trục, 50 Hz | `fall`, `normal` |
-| Scream Detection | `916888`, deploy version `11` | `impulse_handle_916888_1` | 16000 mẫu audio, 16 kHz | `non-scream`, `scream` |
+| Model | Handle | Input | Label |
+| --- | --- | --- | --- |
+| Fall Detection | `impulse_handle_868007_1` | 200 mẫu IMU, 6 trục, 50 Hz | `fall`, `normal` |
+| Scream Detection | `impulse_handle_916888_1` | 16000 mẫu audio, 16 kHz | `non-scream`, `scream` |
 
 Quy trình trong `run_ai_inference()`:
 
