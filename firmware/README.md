@@ -113,8 +113,6 @@ Thông tin MQTT nằm trong `include/config.h`:
 | Topic publish | `wearable/xiao_esp32s3_01/alerts` |
 | Client id prefix | `esp32s3_01_Client` |
 
-`WiFiClientSecure` hiện đang gọi `setInsecure()`, nghĩa là kết nối dùng TLS nhưng không xác thực certificate.
-
 Payload publish:
 
 ```json
@@ -227,19 +225,3 @@ lib_deps =
     lovyan03/LovyanGFX@^1.1.12
     lvgl/lvgl@^8.3.11
 ```
-
-Các điểm build quan trọng:
-
-- `lib_archive = no`
-- `lib_ldf_mode = deep+`
-- Include Edge Impulse: `lib/deploy`, `lib/deploy/model-parameters`, `lib/deploy/tflite-model`
-- PSRAM: `BOARD_HAS_PSRAM`, `board_build.arduino.memory_type = qio_opi`
-- Edge Impulse: `EI_PORTING_ARDUINO=0`, `EI_PORTING_ESPRESSIF=1`
-- LVGL: `LV_CONF_SKIP`, `LV_COLOR_DEPTH=16`, `LV_COLOR_16_SWAP=1`, font Montserrat 20 và 48
-- Partition: `huge_app.csv`
-- `build_src_filter` biên dịch thêm `../lib/deploy/` và loại `../lib/deploy/source/`
-
-## XII. Ghi Chú Bảo Mật
-
-- MQTT password hiện đang nằm trong `include/config.h`. Nếu repo được public hoặc share, nên đưa secret ra file local không commit hoặc cơ chế provisioning riêng.
-- MQTT TLS hiện dùng `setInsecure()`. Nếu cần triển khai thật, nên pin CA certificate hoặc dùng certificate validation đầy đủ.
