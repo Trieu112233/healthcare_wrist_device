@@ -12,7 +12,6 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.firestore.FirebaseFirestore;
 
-
 public class LoginActivity extends AppCompatActivity {
     private Button btnLogin;
     private TextView tvRegister;
@@ -31,6 +30,7 @@ public class LoginActivity extends AppCompatActivity {
                                     .putString("user_phone", phone)
                                     .putBoolean("is_logged_in", true)
                                     .apply();
+
                             Toast.makeText(this, "Đăng nhập thành công", Toast.LENGTH_SHORT).show();
 
                             startAlertService();
@@ -50,7 +50,7 @@ public class LoginActivity extends AppCompatActivity {
 
     private void startAlertService() {
         Intent intent = new Intent(this, FirestoreAlertService.class);
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O){
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             startForegroundService(intent);
         } else {
             startService(intent);
@@ -76,8 +76,8 @@ public class LoginActivity extends AppCompatActivity {
         edtPassword = findViewById(R.id.loginEdtPassword);
 
         btnLogin.setOnClickListener(v -> {
-            String phone = edtUserphone.getText().toString();
-            String password = edtPassword.getText().toString();
+            String phone = edtUserphone.getText().toString().trim();
+            String password = edtPassword.getText().toString().trim();
 
             if (phone.isEmpty() || password.isEmpty()) {
                 Toast.makeText(this, "Vui lòng nhập đầy đủ tài khoản và mật khẩu", Toast.LENGTH_SHORT).show();
@@ -89,7 +89,6 @@ public class LoginActivity extends AppCompatActivity {
 
         tvRegister.setOnClickListener(v -> {
             Toast.makeText(this, "Chuyển sang đăng ký", Toast.LENGTH_SHORT).show();
-            // Chuyển sang màn hình đăng ký (RegisterActivity")
             Intent intent = new Intent(LoginActivity.this, RegisterActivity.class);
             startActivity(intent);
             finish();

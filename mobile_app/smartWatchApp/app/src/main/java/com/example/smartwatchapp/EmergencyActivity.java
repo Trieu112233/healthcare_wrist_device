@@ -1,6 +1,7 @@
 package com.example.smartwatchapp;
 
 import android.app.KeyguardManager;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
@@ -13,18 +14,24 @@ import android.view.WindowManager;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 
 public class EmergencyActivity extends AppCompatActivity {
+    private static final int EMERGENCY_NOTIFICATION_ID = 1001;
+
     private String deviceId;
     private Ringtone ringtone;
-    private TextView tvAlertType, tvDeviceName, tvAlertTime;
+    private ListenerRegistration alertListener;
+    private TextView tvAlertType;
+    private TextView tvDeviceName;
+    private TextView tvAlertTime;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Cấu hình để hiển thị đè lên màn hình khóa (Rất quan trọng cho app khẩn cấp)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true);
             setTurnScreenOn(true);
@@ -40,31 +47,26 @@ public class EmergencyActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_emergency);
 
-        // Ánh xạ View
         tvAlertType = findViewById(R.id.tvAlertType);
         tvDeviceName = findViewById(R.id.tvDeviceName);
         tvAlertTime = findViewById(R.id.tvAlertTime);
 
-        // Lấy dữ liệu từ Intent (Gửi từ Foreground Service)
         deviceId = getIntent().getStringExtra("device_id");
         String type = getIntent().getStringExtra("alert_type");
         String time = getIntent().getStringExtra("last_alert_time");
         if (time == null) time = "Không rõ";
 
-        // Hiển thị lên UI
         tvAlertType.setText(type != null ? type.replace("_", " ") : "CẢNH BÁO");
-        tvDeviceName.setText("Thiết bị: " + deviceId);
+        tvDeviceName.setText("Thiết bị: " + (deviceId != null ? deviceId : "Không rõ"));
         tvAlertTime.setText("Thời gian: " + time);
 
-        // Âm thanh báo động
         Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
         ringtone = RingtoneManager.getRingtone(getApplicationContext(), notification);
         if (ringtone != null) ringtone.play();
 
-        // Rung
-        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-        if (v != null) {
-            v.vibrate(VibrationEffect.createOneShot(3000, VibrationEffect.DEFAULT_AMPLITUDE));
+        Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        if (vibrator != null) {
+            vibrator.vibrate(VibrationEffect.createOneShot(3000, VibrationEffect.DEFAULT_AMPLITUDE));
         }
 
         findViewById(R.id.btnAcknowledge).setOnClickListener(v1 -> acknowledgeAlert());
@@ -72,21 +74,33 @@ public class EmergencyActivity extends AppCompatActivity {
     }
 
     private void acknowledgeAlert() {
+        if (deviceId == null) {
+            stopEffects();
+            dismissEmergencyNotification();
+            finish();
+            return;
+        }
+
         FirebaseFirestore.getInstance().collection("devices").document(deviceId)
                 .update("alert", false)
                 .addOnSuccessListener(aVoid -> {
                     stopEffects();
+                    dismissEmergencyNotification();
                     finish();
-                });
+                })
+                .addOnFailureListener(e -> stopEffects());
     }
 
     private void listenToSelfClose() {
-        FirebaseFirestore.getInstance().collection("devices").document(deviceId)
+        if (deviceId == null) return;
+
+        alertListener = FirebaseFirestore.getInstance().collection("devices").document(deviceId)
                 .addSnapshotListener((snapshot, e) -> {
                     if (snapshot != null && snapshot.exists()) {
                         Boolean alert = snapshot.getBoolean("alert");
                         if (alert != null && !alert) {
                             stopEffects();
+                            dismissEmergencyNotification();
                             finish();
                         }
                     }
@@ -99,8 +113,18 @@ public class EmergencyActivity extends AppCompatActivity {
         }
     }
 
+    private void dismissEmergencyNotification() {
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.cancel(EMERGENCY_NOTIFICATION_ID);
+        }
+    }
+
     @Override
     protected void onDestroy() {
+        if (alertListener != null) {
+            alertListener.remove();
+        }
         stopEffects();
         super.onDestroy();
     }

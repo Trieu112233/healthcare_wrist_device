@@ -1,6 +1,7 @@
 package com.example.smartwatchapp;
 
 import android.Manifest;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -33,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
+    private static final int REQUEST_POST_NOTIFICATIONS = 101;
+
     private RecyclerView rvDevices;
     private DeviceAdapter adapter;
     private List<Device> deviceList;
@@ -41,8 +44,7 @@ public class MainActivity extends AppCompatActivity {
     private FirebaseFirestore db;
     private String userPhone;
 
-    // QUAN TRỌNG: Dùng Map để quản lý listener theo DeviceID, tránh bị lặp
-    private Map<String, ListenerRegistration> deviceListeners = new HashMap<>();
+    private final Map<String, ListenerRegistration> deviceListeners = new HashMap<>();
     private ListenerRegistration userListener;
 
     @Override
@@ -75,7 +77,6 @@ public class MainActivity extends AppCompatActivity {
         loadUserDevices();
 
         fabAddDevice.setOnClickListener(v -> showAddDeviceDialog());
-
         imgLogout.setOnClickListener(v -> logout());
     }
 
@@ -83,13 +84,11 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Thêm thiết bị mới");
 
-        // Tạo ô nhập liệu
         final EditText input = new EditText(this);
         input.setHint("Nhập mã ID thiết bị (VD: xiao_esp32s3_03)");
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         builder.setView(input);
 
-        // Nút xác nhận
         builder.setPositiveButton("Thêm", (dialog, which) -> {
             String deviceId = input.getText().toString().trim();
             if (!deviceId.isEmpty()) {
@@ -99,18 +98,15 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Nút hủy
         builder.setNegativeButton("Hủy", (dialog, which) -> dialog.cancel());
 
         builder.show();
     }
 
     private void checkAndAddDevice(String deviceId) {
-        // Bước 1: Kiểm tra xem thiết bị này có tồn tại trong hệ thống (Collection devices) không
         db.collection("devices").document(deviceId).get()
                 .addOnSuccessListener(documentSnapshot -> {
                     if (documentSnapshot.exists()) {
-                        // Bước 2: Nếu tồn tại, thêm mã ID vào mảng DeviceId của User
                         addDeviceIdToUser(deviceId);
                     } else {
                         Toast.makeText(this, "Mã thiết bị không tồn tại trên hệ thống!", Toast.LENGTH_LONG).show();
@@ -126,7 +122,6 @@ public class MainActivity extends AppCompatActivity {
                 .update("DeviceId", FieldValue.arrayUnion(deviceId))
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Thêm thiết bị thành công!", Toast.LENGTH_SHORT).show();
-                    // Không cần gọi load lại dữ liệu vì SnapshotListener sẽ tự lo phần này
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Không thể thêm thiết bị: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -135,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void startAlertService() {
         Intent intent = new Intent(this, FirestoreAlertService.class);
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent);
         } else {
             startService(intent);
@@ -143,19 +138,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadUserDevices() {
-        // Lắng nghe thông tin User (Tên, DS thiết bị)
         userListener = db.collection("users").document(userPhone)
                 .addSnapshotListener((value, error) -> {
                     if (error != null) return;
 
                     if (value != null && value.exists()) {
-                        // Lưu ý: Trường "Name" viết hoa chữ N theo Firestore của bạn
                         String name = value.getString("Name");
                         TextView tvName = findViewById(R.id.mainTextUserName);
                         TextView tvPhone = findViewById(R.id.mainTextUserPhone);
-                        if(name != null) tvName.setText(name);
+                        if (name != null) tvName.setText(name);
                         tvPhone.setText(userPhone);
 
+                        @SuppressWarnings("unchecked")
                         List<String> deviceIds = (List<String>) value.get("DeviceId");
                         if (deviceIds != null) {
                             manageDeviceListeners(deviceIds);
@@ -165,19 +159,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void manageDeviceListeners(List<String> currentIds) {
-        // 1. Gỡ bỏ những listener của thiết bị không còn trong danh sách mới
         List<String> idsToRemove = new ArrayList<>();
         for (String id : deviceListeners.keySet()) {
             if (!currentIds.contains(id)) {
                 deviceListeners.get(id).remove();
                 idsToRemove.add(id);
-                // Xóa khỏi list hiển thị
                 removeFromList(id);
             }
         }
         for (String id : idsToRemove) deviceListeners.remove(id);
 
-        // 2. Thêm listener cho những thiết bị mới chưa được lắng nghe
         for (String id : currentIds) {
             if (!deviceListeners.containsKey(id)) {
                 listenToDeviceDetails(id);
@@ -249,27 +240,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestAppPermissions() {
-        // 1. Quyền Thông báo (Android 13+) - Hiện popup tại chỗ
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101);
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        REQUEST_POST_NOTIFICATIONS);
             }
         }
 
-        // 2. Quyền Overlay (Hiển thị trên ứng dụng khác) - Nhảy ra Settings
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            if (notificationManager != null && !notificationManager.canUseFullScreenIntent()) {
+                Toast.makeText(this, "Vui lòng bật thông báo toàn màn hình để nhận cảnh báo khi khóa màn hình", Toast.LENGTH_LONG).show();
+                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+                return;
+            }
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, "Vui lòng bật 'Hiển thị trên ứng dụng khác' để nhận cảnh báo", Toast.LENGTH_LONG).show();
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + getPackageName()));
                 startActivity(intent);
-                return; // Dừng lại ở đây để người dùng cấp quyền xong quay lại app mới xin tiếp
+                return;
             }
         }
 
-        // 3. Quyền Tối ưu pin (Chạy ngầm) - Nhảy ra Settings
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
             if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {

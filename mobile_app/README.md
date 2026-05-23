@@ -1,296 +1,266 @@
-# 📱 Chi Tiết Mobile App - Healthcare Wrist Device
+# Ứng Dụng Android
 
-Dưới đây là mô tả chi tiết về ứng dụng này:
+## Tổng Quan
 
----
+`SmartWatchApp` là ứng dụng Android đi kèm hệ thống vòng tay chăm sóc sức khỏe. Ứng dụng dùng Firestore để đăng nhập, quản lý danh sách thiết bị và nhận cảnh báo khẩn cấp theo thời gian thực.
 
-## 🎯 Tổng Quan
+Thông tin chính:
 
-**Mobile App Name:** SmartWatchApp  
-**Package:** com.example.smartwatchapp  
-**Platform:** Android  
-**Min SDK:** 26 (Android 8.0)  
-**Target SDK:** 36 (Android 15)  
-**Build System:** Gradle (Kotlin DSL)  
-**Backend:** Firebase (Firestore + Authentication)
+| Mục | Giá trị |
+| --- | --- |
+| Package | `com.example.smartwatchapp` |
+| Project Android Studio | `mobile_app/smartWatchApp` |
+| Min SDK | 26 |
+| Target SDK | 36 |
+| Compile SDK | 36 |
+| Ngôn ngữ | Java |
+| Công cụ build | Gradle Kotlin DSL |
+| Backend | Firebase Firestore |
 
----
+Ứng dụng hiện chưa dùng Firebase Authentication. Phần đăng nhập kiểm tra trực tiếp document trong collection `users`.
 
-## 🏗️ Kiến Trúc Ứng Dụng
+## Cấu Trúc Project
 
-```
-smartWatchApp/
-├── app/
-│   ├── src/main/
-│   │   ├── java/com/example/smartwatchapp/
-│   │   │   ├── LoginActivity.java          (Đăng nhập)
-│   │   │   ├── RegisterActivity.java       (Đăng ký)
-│   │   │   ├── MainActivity.java           (Màn hình chính)
-│   │   │   ├── EmergencyActivity.java      (Cảnh báo khẩn cấp)
-│   │   │   ├── FirestoreAlertService.java  (Foreground Service)
-│   │   │   ├── Device.java                 (Data Model)
-│   │   │   └── DeviceAdapter.java          (RecyclerView Adapter)
-│   │   ├── res/
-│   │   │   ├── layout/                     (UI Layouts)
-│   │   │   ├── drawable/                   (Icons & Images)
-│   │   │   ├── mipmap-*/                   (App Icons)
-│   │   │   ├── values/                     (Strings, Colors, Styles)
-│   │   │   └── xml/                        (Configurations)
-│   │   └── AndroidManifest.xml
-│   ├── build.gradle.kts                    (Dependencies)
-│   └── google-services.json                (Firebase Config)
-└── settings.gradle.kts
-```
-
----
-
-## 📦 Công Nghệ & Dependencies
-
-```gradle
-// Android Framework
-- androidx.core.ktx
-- androidx.appcompat
-- androidx.constraintlayout
-- androidx.navigation (Fragment & UI)
-- androidx.activity
-- androidx.lifecycle
-
-// UI Components
-- Material Design (com.google.android.material)
-
-// Firebase
-- firebase-firestore (Real-time Database)
-- firebase-core
-
-// Testing
-- JUnit
-- Espresso (Instrumented Tests)
+```text
+mobile_app/smartWatchApp/
+|-- app/
+|   |-- src/main/
+|   |   |-- java/com/example/smartwatchapp/
+|   |   |   |-- LoginActivity.java
+|   |   |   |-- RegisterActivity.java
+|   |   |   |-- MainActivity.java
+|   |   |   |-- FirestoreAlertService.java
+|   |   |   |-- EmergencyActivity.java
+|   |   |   |-- Device.java
+|   |   |   `-- DeviceAdapter.java
+|   |   |-- res/layout/
+|   |   |   |-- activity_login2.xml
+|   |   |   |-- activity_register2.xml
+|   |   |   |-- activity_main2.xml
+|   |   |   |-- activity_emergency.xml
+|   |   |   `-- item_device.xml
+|   |   `-- AndroidManifest.xml
+|   |-- build.gradle.kts
+|   `-- google-services.json
+`-- build.gradle.kts
 ```
 
----
+## Cấu Trúc Firestore
 
-## 🔑 Các Component Chính
+Ứng dụng đang đọc và ghi theo schema sau:
 
-### 1️⃣ **LoginActivity.java** - Đăng Nhập
-- 📱 Giao diện đăng nhập bằng số điện thoại + mật khẩu
-- 🔐 Xác thực người dùng từ Firestore
-- 💾 Lưu thông tin đăng nhập vào SharedPreferences
-- 🔄 Kiểm tra trạng thái đăng nhập khi khởi động
-- ➡️ Chuyển hướng đến MainActivity hoặc RegisterActivity
+```text
+users/{phoneNumber}
+|-- Name: string
+|-- password: string
+`-- DeviceId: array<string>
 
-```java
-// Luồng đăng nhập:
-1. Kiểm tra SharedPreferences (nếu đã đăng nhập → skip)
-2. Nhập số điện thoại + mật khẩu
-3. Query Firestore collection "users"
-4. Kiểm tra mật khẩu
-5. Lưu phone vào SharedPreferences
-6. Khởi động FirestoreAlertService
-7. Chuyển sang MainActivity
+devices/{deviceId}
+|-- name: string
+|-- alert: boolean
+|-- alert_type: string
+`-- last_alert_time: timestamp | null
 ```
 
-### 2️⃣ **MainActivity.java** - Màn Hình Chính ⭐
-**Chức năng chính:**
-- 📋 Hiển thị danh sách thiết bị được kết nối
-- ➕ Thêm thiết bị mới bằng Device ID
-- ❌ Xóa thiết bị (nhấn giữ)
-- 📡 Real-time monitoring với Firestore Snapshot Listener
-- 🔄 Cập nhật trang thái thiết bị (Online/Offline, Alert Status)
-- 🚪 Đăng xuất tài khoản
+Ví dụ user:
 
-**Key Features:**
-```java
-// Quản lý Listeners thông minh
-- Dùng Map<String, ListenerRegistration> để tránh listener lặp
-- Tự động thêm/gỡ listener khi danh sách thiết bị thay đổi
-- Cleanup listeners khi Activity destroy
-
-// Real-time Data Sync
-- Lắng nghe user document từ Firestore
-- Lấy danh sách DeviceId
-- Tự động lắng nghe từng device document
-- Update UI ngay lập tức khi có thay đổi
-```
-
-**Giao diện:**
-- RecyclerView hiển thị danh sách thiết bị
-- Floating Action Button (FAB) để thêm thiết bị
-- Logout button
-- Thông tin user (Tên, SĐT)
-
-### 3️⃣ **FirestoreAlertService.java** - Foreground Service 🔔
-**Mục đích:** Chạy ngầm để giám sát cảnh báo từ thiết bị
-
-```java
-// Chức năng:
-1. Khởi động Foreground Service (chạy luôn ngay cả khi app bị đóng)
-2. Lắng nghe collection "devices" qua Firestore Snapshot Listener
-3. Khi phát hiện alert=true:
-   - Trigger EmergencyActivity
-   - Truyền device_id, alert_type, last_alert_time
-4. Tự động restart nếu bị kill (onTaskRemoved)
-5. Tạo Notification Channel để hiển thị thông báo
-
-// Permissions yêu cầu:
-- FOREGROUND_SERVICE (Chạy foreground service)
-- FOREGROUND_SERVICE_DATA_SYNC (Data sync service)
-- POST_NOTIFICATIONS (Gửi thông báo)
-```
-
-**Notification:**
-```
-"Hệ thống cảnh báo đang chạy"
-"Đang giám sát thiết bị của bạn..."
-```
-
-### 4️⃣ **EmergencyActivity.java** - Cảnh Báo Khẩn Cấp 🚨
-**Kích hoạt khi:** Phát hiện alert từ thiết bị
-
-```java
-// Giao diện:
-- Hiển thị kiểu cảnh báo (Fall_Detection, Scream_Detection, etc.)
-- Hiển thị Device ID
-- Hiển thị thời gian cảnh báo
-- Nút "Acknowledge" để xác nhận
-
-// Hiệu ứng cảnh báo:
-- Âm báo động (Alarm ringtone)
-- Rung điện thoại (3 giây)
-- Sáng màn hình kể cả khi đang khóa (FLAG_SHOW_WHEN_LOCKED)
-- Mở khóa tự động nếu có thể
-
-// Xử lý:
-1. Người dùng nhấn "Acknowledge"
-2. Update Firestore: alert = false
-3. Đóng activity
-4. Hoặc service tự đóng khi alert được reset từ thiết bị
-```
-
-### 5️⃣ **Device.java** - Data Model
-```java
-class Device {
-    String id;              // ID thiết bị (VD: xiao_esp32s3_03)
-    String name;            // Tên thiết bị
-    boolean is_online;      // Trạng thái kết nối
-    boolean alert;          // Có cảnh báo?
-    String alert_type;      // Loại cảnh báo (Fall, Scream, etc)
-    Object last_alert_time; // Timestamp cảnh báo cuối
+```json
+{
+  "Name": "Nguyen Duc Trieu",
+  "password": "abc123",
+  "DeviceId": ["xiao_esp32s3_01"]
 }
 ```
 
-### 6️⃣ **DeviceAdapter.java** - RecyclerView Adapter
-**Hiển thị từng device item:**
+Ví dụ device:
+
+```json
+{
+  "name": "user1",
+  "alert": false,
+  "alert_type": "PHAT_HIEN_NGA",
+  "last_alert_time": null
+}
+```
+
+Các giá trị `alert_type`:
+
+| Giá trị | Ý nghĩa |
+| --- | --- |
+| `PHAT_HIEN_NGA` | Phát hiện ngã |
+| `PHAT_HIEN_TIENG_HET` | Phát hiện tiếng hét |
+| `NGA_VA_HET` | Phát hiện cả ngã và tiếng hét |
+
+## Các Thành Phần Chính
+
+### `LoginActivity`
+
+Chức năng:
+
+- Kiểm tra trạng thái đăng nhập trong `SharedPreferences`.
+- Đăng nhập bằng số điện thoại và mật khẩu lưu trong Firestore.
+- Lưu `user_phone` và `is_logged_in` vào `SharedPreferences`.
+- Khởi động `FirestoreAlertService`.
+- Chuyển sang `MainActivity`.
+
+Luồng đăng nhập:
+
+```text
+Mở app
+  |
+  |-- đã đăng nhập -> MainActivity
+  `-- chưa đăng nhập -> nhập phone/password
+          |
+          `-- users/{phone}.password khớp -> lưu session -> khởi động service -> MainActivity
+```
+
+### `RegisterActivity`
+
+Chức năng:
+
+- Tạo document mới trong `users/{phone}`.
+- Lưu `Name`, `password`, `DeviceId`.
+- `DeviceId` được khởi tạo là mảng rỗng.
+
+Ghi chú: mật khẩu hiện được lưu trực tiếp để phục vụ demo/MVP. Nếu triển khai thật, nên dùng Firebase Auth hoặc hash mật khẩu.
+
+### `MainActivity`
+
+Chức năng:
+
+- Kiểm tra session `user_phone`.
+- Xin các quyền cần thiết để cảnh báo hoạt động ổn định.
+- Khởi động `FirestoreAlertService`.
+- Hiển thị tên người dùng, số điện thoại và danh sách thiết bị.
+- Thêm thiết bị bằng Device ID.
+- Xóa thiết bị khỏi tài khoản bằng thao tác nhấn giữ.
+- Lắng nghe real-time các document `devices/{deviceId}`.
+
+Quản lý listener:
+
+```text
+users/{phone}.DeviceId
+  |
+  `-- manageDeviceListeners(deviceIds)
+        |-- gỡ listener của thiết bị đã xóa
+        `-- thêm listener cho thiết bị mới
+```
+
+Khi thêm thiết bị, app kiểm tra document `devices/{deviceId}` có tồn tại rồi mới thêm id vào mảng `DeviceId`.
+
+### `Device`
+
+Model ánh xạ dữ liệu thiết bị:
 
 ```java
-// Mỗi item hiển thị:
-┌─────────────────────────┐
-│ Device Name             │
-│ ● Online  |  AN TOÀN    │  (or ● Offline | CẢNH BÁO)
-└─────────────────────────┘
-
-// Màu sắc:
-- Online: Xanh (#00E676)
-- Offline: Đỏ (#FF5252)
-- Safe: Xanh (#00E676)
-- Alert: Đỏ + alert_type (#FF5252)
-
-// Tương tác:
-- Long Press: Xóa thiết bị (hiển thị confirm dialog)
+private String id;
+private String name;
+private boolean alert;
+private String alert_type;
+private Object last_alert_time;
 ```
 
----
+`id` lấy từ Firestore document id sau khi đọc snapshot.
 
-## 📋 Luồng Hoạt Động Chi Tiết
+### `DeviceAdapter`
 
-### 1. **Khởi Động App**
-```
-App Launch
-    ↓
-LoginActivity.onCreate()
-    ├─ Kiểm tra SharedPreferences("AUTH")
-    ├─ Nếu đã đăng nhập → MainActivity
-    └─ Nếu chưa → Hiển thị form đăng nhập
+Mỗi item thiết bị hiển thị:
+
+```text
+Tên thiết bị
+ID: xiao_esp32s3_01
+[AN TOÀN] hoặc [PHAT_HIEN_NGA]
 ```
 
-### 2. **Đăng Nhập**
-```
-User nhập Phone + Password
-    ↓
-loginUser(phone, password)
-    ├─ Query: db.collection("users").document(phone).get()
-    ├─ Kiểm tra password match
-    ├─ Lưu: SharedPreferences.putString("user_phone", phone)
-    ├─ startForegroundService(FirestoreAlertService)
-    └─ Intent → MainActivity
+Tương tác:
+
+- Nhấn giữ item để xóa thiết bị khỏi user hiện tại.
+- Thao tác xóa chỉ remove id khỏi `users/{phone}.DeviceId`, không xóa document trong `devices`.
+
+### `FirestoreAlertService`
+
+Đây là foreground service giám sát cảnh báo nền.
+
+Chức năng:
+
+- Chạy foreground service với notification nền.
+- Lắng nghe `users/{phone}.DeviceId`.
+- Với mỗi device id, lắng nghe `devices/{deviceId}`.
+- Khi `alert == true`, tạo cảnh báo khẩn cấp.
+- Tránh mở lại cùng một cảnh báo bằng `handledAlertKeys`.
+- Tự restart service qua `onTaskRemoved()`.
+
+Luồng cảnh báo:
+
+```text
+devices/{deviceId}.alert == true
+  |
+  |-- đọc alert_type
+  |-- đọc last_alert_time
+  |-- tạo alert key: deviceId + alert_type + timestamp
+  |-- nếu alert key chưa xử lý
+          |
+          `-- hiển thị full-screen emergency notification
 ```
 
-### 3. **MainActivity - Real-time Sync**
-```
-MainActivity.onCreate()
-    ├─ Lấy userPhone từ SharedPreferences
-    ├─ requestAppPermissions() [Notifications, Overlay, Battery]
-    ├─ startAlertService()
-    ├─ Setup RecyclerView + DeviceAdapter
-    └─ loadUserDevices()
-            ↓
-        addSnapshotListener("users/{userPhone}")
-            ├─ Lấy danh sách DeviceId
-            └─ manageDeviceListeners(deviceIds)
-                    ├─ Gỡ listener của device đã xóa
-                    └─ Thêm listener cho device mới
-                            ↓
-                        listenToDeviceDetails(deviceId)
-                            ├─ addSnapshotListener("devices/{deviceId}")
-                            └─ Cập nhật UI: updateList(device)
+Service dùng 2 notification channel:
+
+| Channel | Mục đích |
+| --- | --- |
+| `AlertServiceChannel` | Notification nền báo service đang giám sát |
+| `EmergencyAlertChannel` | Notification khẩn cấp có full-screen intent |
+
+### `EmergencyActivity`
+
+`EmergencyActivity` được mở từ full-screen notification khi có cảnh báo.
+
+Chức năng:
+
+- Hiển thị loại cảnh báo, device id và thời gian.
+- Bật âm báo động.
+- Rung 3 giây.
+- Hiển thị trên màn hình khóa bằng `setShowWhenLocked(true)` và `setTurnScreenOn(true)`.
+- Lắng nghe chính document device để tự đóng khi `alert = false`.
+- Khi người dùng bấm xác nhận, update `devices/{deviceId}.alert = false`.
+- Hủy notification khẩn cấp sau khi xác nhận hoặc sau khi cảnh báo được reset.
+
+## Cảnh Báo Toàn Màn Hình
+
+Service không gọi trực tiếp `startActivity()` từ nền khi có cảnh báo. Thay vào đó, app tạo notification khẩn cấp:
+
+```java
+.setCategory(NotificationCompat.CATEGORY_ALARM)
+.setPriority(NotificationCompat.PRIORITY_MAX)
+.setFullScreenIntent(fullScreenIntent, true)
 ```
 
-### 4. **Thêm Thiết Bị Mới**
-```
-User nhấn FAB "Thêm thiết bị"
-    ↓
-showAddDeviceDialog()
-    ├─ Input Device ID (VD: xiao_esp32s3_03)
-    └─ Nhấn "Thêm"
-            ↓
-        checkAndAddDevice(deviceId)
-            ├─ Query: db.collection("devices").document(deviceId).get()
-            ├─ Nếu tồn tại:
-            │   └─ addDeviceIdToUser(deviceId)
-            │       └─ db.collection("users/{userPhone}")
-            │           .update("DeviceId", arrayUnion(deviceId))
-            └─ Nếu không: Toast "Mã thiết bị không tồn tại"
-                    ↓
-            MainActivity Snapshot Listener tự cập nhật
+Cách này giúp cảnh báo ổn định hơn khi:
+
+- Màn hình điện thoại đang tắt.
+- Điện thoại đang khóa.
+- App đang chạy nền.
+- Android hạn chế việc mở Activity trực tiếp từ background.
+
+Trên Android 14+, người dùng có thể cần bật quyền thông báo toàn màn hình trong Settings. App kiểm tra bằng:
+
+```java
+notificationManager.canUseFullScreenIntent()
 ```
 
-### 5. **Cảnh Báo Khẩn Cấp**
-```
-FirestoreAlertService lắng nghe devices
-    ↓
-Phát hiện: device.alert = true
-    ↓
-triggerEmergencyAlert(deviceId, alertType, time)
-    ├─ Intent("device_id", "alert_type", "last_alert_time")
-    └─ startActivity(EmergencyActivity)
-            ↓
-        EmergencyActivity.onCreate()
-            ├─ Hiển thị Alert Dialog
-            ├─ Play Ringtone + Vibrate
-            ├─ Sáng màn hình (mở khóa nếu cần)
-            └─ Lắng nghe listenToSelfClose()
-                    ↓
-                Khi alert reset từ thiết bị
-                    └─ finish() (đóng EmergencyActivity)
+Nếu chưa được phép, app mở:
+
+```java
+Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT
 ```
 
----
+## Quyền Cần Cấp
 
-## 🔐 Permissions Yêu Cầu
+Manifest hiện khai báo:
 
 ```xml
-<!-- AndroidManifest.xml -->
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 <uses-permission android:name="android.permission.VIBRATE" />
@@ -300,75 +270,26 @@ triggerEmergencyAlert(deviceId, alertType, time)
 <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 ```
 
----
+`MainActivity.requestAppPermissions()` xử lý:
 
-## 📱 Activities & Services
+| Phiên bản Android | Quyền/cài đặt |
+| --- | --- |
+| Android 13+ | Quyền thông báo |
+| Android 14+ | Quyền thông báo toàn màn hình |
+| Android 6+ | Quyền hiển thị trên ứng dụng khác |
+| Android 6+ | Bỏ qua tối ưu pin |
 
-### Activities:
-1. **LoginActivity** - Màn hình đăng nhập (Entry point)
-2. **RegisterActivity** - Đăng ký tài khoản (chưa implement đầy đủ)
-3. **MainActivity** - Màn hình chính, quản lý thiết bị
-4. **EmergencyActivity** - Hiển thị cảnh báo khẩn cấp (showOnLockScreen=true, turnScreenOn=true)
+Luồng cảnh báo chính dùng full-screen notification. Quyền hiển thị trên ứng dụng khác vẫn được kiểm tra, nhưng app hiện không tự vẽ overlay riêng.
 
-### Services:
-1. **FirestoreAlertService** - Foreground service giám sát cảnh báo 24/7
+## Cấu Hình Build
 
----
+`app/build.gradle.kts`:
 
-## 🎨 UI Resources
-
-```
-res/
-├── layout/
-│   ├── activity_login2.xml          (Login screen)
-│   ├── activity_main2.xml           (Main screen with RecyclerView)
-│   ├── activity_emergency.xml       (Emergency alert)
-│   └── item_device.xml              (Device list item)
-├── drawable/                         (Icons)
-├── mipmap-{hdpi,mdpi,xhdpi,...}/   (App icons - multiple resolutions)
-├── values/
-│   ├── strings.xml                  (Text resources - Vietnamese)
-│   ├── colors.xml                   (Color definitions)
-│   ├── themes.xml                   (App themes)
-│   └── dimens.xml                   (Dimensions)
-└── xml/
-    ├── backup_rules.xml             (Data backup policy)
-    └── data_extraction_rules.xml    (GDPR compliance)
-```
-
----
-
-## 🔗 Firebase Integration
-
-### Firestore Collections Structure:
-
-```
-Firestore Database
-├── users/
-│   └── {phone}/
-│       ├── Name: "Nguyễn Đức Triệu"
-│       ├── password: "hashed_password"
-│       └── DeviceId: ["xiao_esp32s3_01", "xiao_esp32s3_02", ...]
-│
-└── devices/
-    └── {deviceId}/
-        ├── name: "Device 1"
-        ├── is_online: true/false
-        ├── alert: true/false
-        ├── alert_type: "Fall_Detection" | "Scream_Detection"
-        └── last_alert_time: Timestamp
-```
-
----
-
-## ⚙️ Build Configuration
-
-```gradle kts
-// app/build.gradle.kts
+```kotlin
 android {
     namespace = "com.example.smartwatchapp"
     compileSdk = 36
-    
+
     defaultConfig {
         applicationId = "com.example.smartwatchapp"
         minSdk = 26
@@ -376,42 +297,50 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
-    
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    
-    buildFeatures {
-        viewBinding = true  // View Binding enabled
-    }
 }
 ```
 
----
+Dependencies chính:
 
-## 🎯 Tính Năng Chính
+```kotlin
+implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
+implementation("com.google.firebase:firebase-firestore")
+implementation("androidx.lifecycle:lifecycle-service:2.10.0")
+```
 
-✅ **Authentication** - Đăng nhập bằng phone + password  
-✅ **Device Management** - Thêm/xóa thiết bị theo dõi  
-✅ **Real-time Monitoring** - Cập nhật trạng thái thiết bị ngay lập tức  
-✅ **Emergency Alerts** - Cảnh báo khẩn cấp khi phát hiện sự cố  
-✅ **Background Service** - Giám sát 24/7 ngay cả khi app bị đóng  
-✅ **Multi-device Support** - Theo dõi nhiều thiết bị cùng lúc  
-✅ **Push Notifications** - Thông báo cảnh báo trên lock screen  
-✅ **Vietnamese Localization** - Giao diện tiếng Việt  
+## Build Và Cài Đặt Bằng Android Studio
 
----
+1. Mở Android Studio.
+2. Chọn **Open**.
+3. Mở thư mục:
 
-## 🚀 Cách Sử Dụng
+```text
+mobile_app/smartWatchApp
+```
 
-1. **Cài đặt:** Compile project bằng Android Studio
-2. **Chạy:** Deploy trên emulator hoặc thiết bị thật (Android 8.0+)
-3. **Đăng nhập:** Sử dụng phone + password có trong Firestore
-4. **Thêm thiết bị:** Nhập Device ID từ wearable device
-5. **Giám sát:** Theo dõi trạng thái real-time
-6. **Cảnh báo:** Nhận thông báo khẩn cấp khi có sự cố
+4. Đợi Android Studio sync Gradle.
+5. Kết nối điện thoại Android bằng USB và bật **USB debugging**.
+6. Chọn thiết bị thật trong thanh run target.
+7. Bấm **Run** để build và cài app vào thiết bị.
 
----
+Khi chạy trên thiết bị thật, cần cấp các quyền mà app yêu cầu, đặc biệt là:
 
-Đây là một ứng dụng **Health Monitoring Companion** đầy đủ với focus vào **Real-time Alert System** cho các thiết bị đeo tay chuyên về phát hiện ngã và cảnh báo khẩn cấp! 🏥📱
+- Quyền thông báo.
+- Quyền thông báo toàn màn hình trên Android 14+.
+- Quyền bỏ qua tối ưu pin.
+- Quyền hiển thị trên ứng dụng khác nếu app mở màn hình Settings yêu cầu.
+
+## Cách Sử Dụng
+
+1. Cài app từ Android Studio lên điện thoại.
+2. Đăng ký tài khoản hoặc tạo sẵn user trong Firestore.
+3. Đăng nhập bằng số điện thoại và mật khẩu.
+4. Cấp các quyền được app yêu cầu.
+5. Thêm Device ID đã tồn tại trong collection `devices`.
+6. Khi Node-RED update `devices/{deviceId}.alert = true`, app mở cảnh báo khẩn cấp.
+7. Người dùng bấm xác nhận để set `alert = false`.

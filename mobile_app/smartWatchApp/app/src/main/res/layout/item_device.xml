@@ -33,14 +33,14 @@
             app:layout_constraintStart_toEndOf="@id/imgDeviceIcon"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- Trạng thái Kết nối (Online/Offline) -->
+        <!-- Metadata thiết bị. Không hiển thị Online/Offline vì schema hiện không có heartbeat. -->
         <TextView
-            android:id="@+id/tvConnectionStatus"
+            android:id="@+id/tvDeviceMeta"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="● Online"
-            android:textColor="#00E676"
+            android:text="ID: xiao_esp32s3_01"
+            android:textColor="#B0B0B0"
             android:textSize="12sp"
             app:layout_constraintStart_toStartOf="@id/tvDeviceName"
             app:layout_constraintTop_toBottomOf="@id/tvDeviceName" />

@@ -17,7 +17,10 @@ import java.util.Map;
 
 public class RegisterActivity extends AppCompatActivity {
 
-    private EditText edtFullName, edtRegisterPhoneNum, edtRegisterPassword, edtConfirmPassword;
+    private EditText edtFullName;
+    private EditText edtRegisterPhoneNum;
+    private EditText edtRegisterPassword;
+    private EditText edtConfirmPassword;
     private Button btnRegister;
     private TextView tvBackToLogin;
     private FirebaseFirestore db;
@@ -36,14 +39,15 @@ public class RegisterActivity extends AppCompatActivity {
                         db.collection("users").document(phone)
                                 .set(user)
                                 .addOnSuccessListener(aVoid -> {
-                                   Toast.makeText(this, "Đăng ký thành công", Toast.LENGTH_SHORT).show();
-                                   finish();
+                                    Toast.makeText(this, "Đăng ký thành công", Toast.LENGTH_SHORT).show();
+                                    finish();
                                 })
-                                .addOnFailureListener(e -> {
-                                    Toast.makeText(this, "Lỗi " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                                });
+                                .addOnFailureListener(e ->
+                                        Toast.makeText(this, "Lỗi " + e.getMessage(), Toast.LENGTH_SHORT).show());
                     }
-                });
+                })
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Lỗi " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
     @Override
@@ -67,12 +71,12 @@ public class RegisterActivity extends AppCompatActivity {
             String password = edtRegisterPassword.getText().toString().trim();
             String confirmPassword = edtConfirmPassword.getText().toString().trim();
 
-            if(name.isEmpty() || phone.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()){
+            if (name.isEmpty() || phone.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
                 Toast.makeText(this, "Vui lòng nhập đầy đủ thông tin", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            if(!password.equals(confirmPassword)){
+            if (!password.equals(confirmPassword)) {
                 Toast.makeText(this, "Mật khẩu không khớp", Toast.LENGTH_SHORT).show();
                 return;
             }
