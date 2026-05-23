@@ -1,129 +1,169 @@
-# 🔴 Node-RED Flow Configuration
+# Node-RED Flow
 
 ## Tổng Quan
 
-Node-RED flow này xử lý dữ liệu từ ESP32 wearable device qua MQTT, lưu trữ vào Firestore, và kiểm soát các điều kiện cảnh báo.
+Flow Node-RED này nhận cảnh báo từ thiết bị ESP32-S3 qua MQTT, lọc dữ liệu cảnh báo, ghi trạng thái cảnh báo vào Firestore, và đo độ trễ từ lúc nhận MQTT đến sau khi ghi Firestore.
 
-## Architecture
+Kiến trúc hiện tại:
 
+```text
+ESP32-S3
+  |
+  | MQTT topic: wearable/+/alerts
+  v
+HiveMQ Cloud
+  |
+  v
+Node-RED
+  |-- Debug thông điệp gốc
+  |-- Ghi startTime
+  |-- Lọc alert + định dạng Firestore payload
+  |-- Firestore update devices/{deviceId}
+  |-- Ghi endTime
+  `-- Tính timediff
 ```
-MQTT Broker (HiveMQ)
-        ↓
-   Node-RED Server
-        ↓
-   ┌────────────────────┐
-   │   Parse JSON       │
-   │   Validate Data    │
-   └────┬───────────────┘
-        │
-   ┌────┴─────────────────────┐
-   │                          │
-   ▼                          ▼
-Firestore DB            Mobile App Alert
-(Users/Devices)         (via Firebase)
+
+## Flow Hiện Tại
+
+File flow: `node-red/flows.json`
+
+Các node chính:
+
+| Node | Loại | Vai trò |
+| --- | --- | --- |
+| `Nhận Alert Đồng Hồ` | `mqtt in` | Subscribe MQTT topic `wearable/+/alerts` từ HiveMQ. |
+| `Thông điệp gốc (JSON)` | `debug` | Hiển thị payload MQTT gốc. |
+| Change node `startTime` | `change` | Ghi timestamp bắt đầu xử lý vào `msg.startTime`. |
+| `Lọc & định dạng dữ liệu alert` | `function` | Kiểm tra threshold, xác định loại cảnh báo, tạo payload Firestore. |
+| `Data đẩy lên firestore` | `debug` | Hiển thị payload sẽ ghi Firestore. |
+| `đẩy alert lên firestore` | `Firestore out` | Update document `devices/{deviceId}`. |
+| Change node `endTime` | `change` | Ghi timestamp sau khi Firestore node xử lý xong. |
+| `Tính timediff` | `function` | Tính `msg.endTime - msg.startTime`. |
+| `timediff` | `debug` | Hiển thị độ trễ xử lý theo mili-giây. |
+
+## MQTT
+
+### Broker
+
+- Broker: HiveMQ Cloud
+- Host: `08c8ad4b15ac4370b81835f72e145e5a.s1.eu.hivemq.cloud`
+- Port: `8883`
+- TLS: bật
+- MQTT protocol version: 4
+- Keepalive: 60 giây
+- QoS của MQTT input node: `2`
+
+Thông tin username/password đang nằm trong comment node của flow. Nếu chia sẻ repo public, nên xóa secret khỏi flow và cấu hình bằng environment variable hoặc credential store của Node-RED.
+
+### Topic
+
+Node MQTT input đang subscribe:
+
+```text
+wearable/+/alerts
 ```
 
-## Flow Components
+Ký tự `+` cho phép flow nhận alert từ nhiều thiết bị theo cùng format topic.
 
-### 1. MQTT Input Node
-- **Broker:** HiveMQ Cloud
-- **Topic:** `healthcare/alert`
-- **QoS:** 1 (At least once)
-- **Payload:** JSON format
+### Payload Từ Firmware
+
 ```json
 {
   "deviceId": "xiao_esp32s3_01",
   "fall_confidence": 0.95,
-  "scream_confidence": 0.0,
-  "timestamp": 1704067200000
+  "scream_confidence": 0.0
 }
 ```
 
-### 2. JSON Parser
-- Xác thực cấu trúc dữ liệu
-- Kiểm tra ngưỡng confidence (≥0.80)
-- Trích xuất deviceId
+## Firestore
 
-### 3. Firestore Update Node
-- **Collection:** `devices/{deviceId}`
-- **Update fields:**
-  - `alert`: true/false
-  - `alert_type`: "fall_detection" | "scream_detection" | "both"
-  - `last_alert_time`: Timestamp
-  - `fall_confidence`: Float (0-1)
-  - `scream_confidence`: Float (0-1)
+Firestore node hiện dùng package:
 
-### 4. Function Nodes
-- **Alert Logger:** Ghi log cảnh báo
-- **Notification Trigger:** Gửi thông báo tới Firebase
-- **Data Processor:** Tính toán thống kê
+```text
+node-red-contrib-cloud-firestore@3.2.0
+```
 
-## Cài Đặt Node-RED
+Function node đặt `msg.firestore` trước khi đưa vào `Firestore out`:
 
-### 1. Cài đặt Node-RED
+```js
+msg.firestore = {
+    operation: "update",
+    collection: "devices",
+    document: targetDevice
+};
+```
+
+Document được cập nhật:
+
+```text
+devices/{deviceId}
+```
+
+Payload hiện ghi vào Firestore:
+
+```json
+{
+  "alert": true,
+  "alert_type": "PHAT_HIEN_NGA",
+  "last_alert_time": "_serverTimestamp"
+}
+```
+
+Các loại `alert_type` trong flow:
+
+| Điều kiện | `alert_type` |
+| --- | --- |
+| Fall >= 0.8 và Scream >= 0.8 | `NGA_VA_HET` |
+| Fall >= 0.8 | `PHAT_HIEN_NGA` |
+| Scream >= 0.8 | `PHAT_HIEN_TIENG_HET` |
+
+## Chặn Cảnh Báo Lặp Theo Loại Alert
+
+Vấn đề: nếu một tiếng hét kéo dài, firmware có thể publish nhiều alert liên tiếp. Nếu Node-RED ghi tất cả vào Firestore, app sẽ liên tục nhận snapshot update và gây khó chịu cho người dùng.
+
+Cách xử lý nên đặt ở Node-RED: chặn lặp theo từng cặp `deviceId + alertType`.
+
+Ví dụ:
+
+- Thiết bị `xiao_esp32s3_01` vừa gửi `PHAT_HIEN_TIENG_HET`.
+- Trong 30 giây tiếp theo, các alert `PHAT_HIEN_TIENG_HET` từ cùng thiết bị sẽ bị bỏ qua.
+- Nếu trong thời gian đó có `PHAT_HIEN_NGA`, flow vẫn cho qua vì đây là loại alert khác và quan trọng hơn.
+
+## Đo Độ Trễ
+
+Flow hiện có các node:
+
+```text
+startTime -> Firestore out -> endTime -> Tính timediff -> debug timediff
+```
+
+Function `Tính timediff`:
+
+```js
+msg.payload = msg.endTime - msg.startTime;
+return msg;
+```
+
+Kết quả debug là độ trễ tính bằng mili-giây từ lúc message đi qua change node `startTime` đến sau khi Firestore node trả output.
+
+## Cài Đặt
+
+### 1. Cài Node-RED
+
 ```bash
 npm install -g node-red
 ```
 
-### 2. Cài đặt packages
+### 2. Cài Firestore node
+
 ```bash
-node-red-admin install node-red-contrib-firebase-realtime
-node-red-admin install node-red-contrib-mqtt-broker
+node-red-admin install node-red-contrib-cloud-firestore
 ```
 
-### 3. Import flows.json
-- Mở Node-RED dashboard (http://localhost:1880)
-- Menu → Import → Paste flows.json
-- Deploy
+### 3. Import Flow
 
-## Firestore Integration
-
-### Credentials
-1. Tạo Service Account từ Firebase Console
-2. Download JSON key file
-3. Thêm vào environment variables:
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/serviceAccountKey.json"
-```
-
-### Database Structure
-```
-firestore/
-├── users/{phoneNumber}
-│   ├── Name: string
-│   ├── DeviceId: array
-│   └── password: string
-│
-└── devices/{deviceId}
-    ├── name: string
-    ├── is_online: boolean
-    ├── alert: boolean
-    ├── alert_type: string
-    ├── fall_confidence: float
-    ├── scream_confidence: float
-    └── last_alert_time: timestamp
-```
-
-## Monitoring
-
-### Debug Mode
-```bash
-node-red --userDir ~/.node-red --verbose
-```
-
-### Logs
-- Xem real-time logs trong Node-RED dashboard
-- File logs: `~/.node-red/logs/`
-
-## Troubleshooting
-
-| Vấn đề | Giải pháp |
-|--------|----------|
-| MQTT không kết nối | Kiểm tra broker URL, port, credentials |
-| Firestore update thất bại | Kiểm tra Service Account permissions |
-| Data không xuất hiện | Xem debug tab trong Node-RED |
-| Cảnh báo bị trễ | Kiểm tra MQTT QoS, Firestore latency |
-
----
-
-**Phục vụ cho khóa luận: Hệ thống Đeo tay Chăm sóc Sức khỏe**
+1. Mở Node-RED dashboard: `http://localhost:1880`
+2. Chọn menu -> Import
+3. Import nội dung từ `node-red/flows.json`
+4. Cấu hình Firebase Admin credentials cho node `fall_scream_detection`
+5. Deploy

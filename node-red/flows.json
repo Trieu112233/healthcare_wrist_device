@@ -1,136 +1,5 @@
 [
     {
-        "id": "570c44e401933bf0",
-        "type": "tab",
-        "label": "Flow 1",
-        "disabled": false,
-        "info": "",
-        "env": []
-    },
-    {
-        "id": "b3d516b7c21d0f95",
-        "type": "mqtt-broker",
-        "name": "",
-        "broker": "08c8ad4b15ac4370b81835f72e145e5a.s1.eu.hivemq.cloud",
-        "port": "8883",
-        "tls": "",
-        "clientid": "",
-        "autoConnect": true,
-        "usetls": true,
-        "protocolVersion": 4,
-        "keepalive": 60,
-        "cleansession": true,
-        "autoUnsubscribe": true,
-        "birthTopic": "",
-        "birthQos": "0",
-        "birthRetain": "false",
-        "birthPayload": "",
-        "birthMsg": {},
-        "closeTopic": "",
-        "closeQos": "0",
-        "closeRetain": "false",
-        "closePayload": "",
-        "closeMsg": {},
-        "willTopic": "",
-        "willQos": "0",
-        "willRetain": "false",
-        "willPayload": "",
-        "willMsg": {},
-        "userProps": "",
-        "sessionExpiry": ""
-    },
-    {
-        "id": "b59643743635a301",
-        "type": "firebase admin",
-        "name": "fall_detection"
-    },
-    {
-        "id": "86f34952d8c48ffa",
-        "type": "mqtt in",
-        "z": "570c44e401933bf0",
-        "name": "Nhận Alert Đồng Hồ",
-        "topic": "wearable/+/alerts",
-        "qos": "2",
-        "datatype": "auto-detect",
-        "broker": "b3d516b7c21d0f95",
-        "nl": false,
-        "rap": true,
-        "rh": 0,
-        "inputs": 0,
-        "x": 390,
-        "y": 240,
-        "wires": [
-            [
-                "1de07567d7c8501a",
-                "33ff9ec77595b779"
-            ]
-        ]
-    },
-    {
-        "id": "1de07567d7c8501a",
-        "type": "function",
-        "z": "570c44e401933bf0",
-        "name": "Lọc & định dạng dữ liệu alert",
-        "func": "var incomingData = msg.payload;\n\nif (incomingData.fall_confidence >= 0.7 || incomingData.scream_confidence >= 0.7) {\n    \n    var alertType = \"UNKNOWN\";\n    if (incomingData.fall_confidence >= 0.7 && incomingData.scream_confidence >= 0.7) {\n        alertType = \"NGA_VA_HET\";\n    } else if (incomingData.fall_confidence >= 0.7) {\n        alertType = \"PHAT_HIEN_NGA\";\n    } else {\n        alertType = \"TIENG_HET_LON\";\n    }\n\n    // Phải để operation, collection, document\n    // vào bên trong object `msg.firestore`\n    var targetDevice = incomingData.deviceId;\n    \n    msg.firestore = {\n        operation: \"update\",          // Chỉ định rõ hành động mong muốn\n        collection: \"devices\",        // Tên bảng\n        document: targetDevice        // Tên TÀI LIỆU CẦN SỬA\n    };\n\n    // Dữ liệu payload: Những trường bạn cần Firebase cập nhật\n    msg.payload = {\n        alert: true,\n        alert_type: alertType,\n        last_alert_time: \"_serverTimestamp\" // Cực hay! Theo tài liệu, nó sẽ tự lấp đầy giờ server thực tế\n    };\n    \n    return msg; \n}\n\nreturn null;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 240,
-        "wires": [
-            [
-                "4af9738b6e466bb6",
-                "725a6ecc1121b3d1"
-            ]
-        ]
-    },
-    {
-        "id": "b6808131a789fd18",
-        "type": "comment",
-        "z": "570c44e401933bf0",
-        "name": "",
-        "info": "username: esp32s3_client\npassword: Abcd13579!",
-        "x": 320,
-        "y": 100,
-        "wires": []
-    },
-    {
-        "id": "4af9738b6e466bb6",
-        "type": "debug",
-        "z": "570c44e401933bf0",
-        "name": "debug 1",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 920,
-        "y": 180,
-        "wires": []
-    },
-    {
-        "id": "33ff9ec77595b779",
-        "type": "debug",
-        "z": "570c44e401933bf0",
-        "name": "debug 2",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "false",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 580,
-        "y": 160,
-        "wires": []
-    },
-    {
         "id": "725a6ecc1121b3d1",
         "type": "Firestore out",
         "z": "570c44e401933bf0",
@@ -143,11 +12,18 @@
         "x": 980,
         "y": 240,
         "wires": [
-            []
+            [
+                "df6d54d34abc54d6"
+            ]
         ]
     },
     {
-        "id": "33e9defab809e284",
+        "id": "b59643743635a301",
+        "type": "firebase admin",
+        "name": "fall_scream_detection"
+    },
+    {
+        "id": "918f39d462a0496b",
         "type": "global-config",
         "env": [],
         "modules": {
