@@ -53,8 +53,6 @@ Các node chính:
 - Keepalive: 60 giây
 - QoS của MQTT input node: `2`
 
-Thông tin username/password đang nằm trong comment node của flow. Nếu chia sẻ repo public, nên xóa secret khỏi flow và cấu hình bằng environment variable hoặc credential store của Node-RED.
-
 ### Topic
 
 Node MQTT input đang subscribe:
@@ -117,17 +115,18 @@ Các loại `alert_type` trong flow:
 | Fall >= 0.8 | `PHAT_HIEN_NGA` |
 | Scream >= 0.8 | `PHAT_HIEN_TIENG_HET` |
 
-## Chặn Cảnh Báo Lặp Theo Loại Alert
+## Chặn Cảnh Báo Lặp Cho Tiếng Hét
 
 Vấn đề: nếu một tiếng hét kéo dài, firmware có thể publish nhiều alert liên tiếp. Nếu Node-RED ghi tất cả vào Firestore, app sẽ liên tục nhận snapshot update và gây khó chịu cho người dùng.
 
-Cách xử lý nên đặt ở Node-RED: chặn lặp theo từng cặp `deviceId + alertType`.
+Cách xử lý trong flow hiện tại: chỉ chặn lặp alert `PHAT_HIEN_TIENG_HET` theo từng thiết bị. Cảnh báo ngã (`PHAT_HIEN_NGA`) và ngã kèm hét (`NGA_VA_HET`) không bị cooldown.
 
 Ví dụ:
 
 - Thiết bị `xiao_esp32s3_01` vừa gửi `PHAT_HIEN_TIENG_HET`.
 - Trong 30 giây tiếp theo, các alert `PHAT_HIEN_TIENG_HET` từ cùng thiết bị sẽ bị bỏ qua.
 - Nếu trong thời gian đó có `PHAT_HIEN_NGA`, flow vẫn cho qua vì đây là loại alert khác và quan trọng hơn.
+- Nếu trong thời gian đó có `PHAT_HIEN_NGA` hoặc `NGA_VA_HET`, flow vẫn cho qua ngay.
 
 ## Đo Độ Trễ
 
