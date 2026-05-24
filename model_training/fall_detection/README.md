@@ -4,7 +4,7 @@
 
 - **Nguồn dữ liệu:** WEDA-FALL (`joaojtmarques/WEDA-FALL`), gồm tín hiệu IMU 6 bậc tự do từ cảm biến đeo cổ tay: `accel_x`, `accel_y`, `accel_z`, `gyro_x`, `gyro_y`, `gyro_z`.
 - **Dữ liệu gốc:** các hoạt động sống thường ngày (ADL, thư mục `Dxx`) và các sự kiện té ngã (thư mục `Fxx`).
-- **Script tiền xử lý:** `preprocess_edge_impulse.py`, giữ lại để minh họa/tái lập quy trình xử lý đã dùng trong đồ án.
+- **Script tiền xử lý:** `preprocess_edge_impulse.py`, minh họa quy trình tiền xử lý dữ liệu đã dùng trong đồ án.
 - **Dữ liệu dùng để huấn luyện:** `WEDA-FALL-main/dataset/processed_individual`, đây là dữ liệu đã tiền xử lý sẵn và có thể upload lên Edge Impulse trực tiếp.
 
 Quy trình tiền xử lý đã thực hiện và được thể hiện trong script:

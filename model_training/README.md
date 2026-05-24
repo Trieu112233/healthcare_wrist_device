@@ -14,8 +14,6 @@ Hai mô hình được xây dựng, huấn luyện, đánh giá và lượng t�
 - `fall_detection/`: dữ liệu WEDA-FALL đã tiền xử lý, script minh họa quy trình tiền xử lý và tài liệu mô hình phát hiện ngã.
 - `scream_detection/`: dữ liệu âm thanh đã chuẩn hóa, script minh họa quy trình chuẩn hóa âm thanh và tài liệu mô hình phát hiện tiếng hét.
 
-Lưu ý: hai script Python trong các thư mục con được giữ lại để trình bày/tái lập quy trình với giảng viên. Dữ liệu đang đặt trong repo đã là dữ liệu sau tiền xử lý, không cần chạy lại script trước khi upload lên Edge Impulse.
-
 ## Giải pháp hợp nhất mô hình
 
 Đồ án sử dụng công cụ mã nguồn mở [edgeimpulse/multi-impulse-deployment-block](https://github.com/edgeimpulse/multi-impulse-deployment-block) để hợp nhất hai C++ library xuất từ Edge Impulse thành một thư viện duy nhất.

@@ -7,7 +7,7 @@
   2. **Audio Dataset of Scream and Non Scream**.
 - **Nhãn:** `scream` cho tiếng hét/kêu cứu và `non-scream` cho âm thanh sinh hoạt, tiếng ồn nền, tiếng nói chuyện bình thường.
 - **Thư mục dữ liệu dùng để huấn luyện trong repo:** `scream_dataset/Screaming` và `scream_dataset/NotScreaming`. Đây là dữ liệu đã được chuẩn hóa/tiền xử lý sẵn và có thể upload lên Edge Impulse trực tiếp.
-- **Script tiền xử lý:** `resample_audio.py`, giữ lại để minh họa/tái lập bước chuẩn hóa audio đã dùng trong đồ án.
+- **Script tiền xử lý:** `resample_audio.py`, script tiền xử lý dữ liệu audio đã dùng trong đồ án.
 
 Quy trình tiền xử lý đã thực hiện và được thể hiện trong script:
 
@@ -16,8 +16,6 @@ Quy trình tiền xử lý đã thực hiện và được thể hiện trong sc
 - Hạ tần số lấy mẫu xuống **16 kHz** để đủ bao phủ dải giọng nói người và giảm chi phí xử lý trên vi điều khiển.
 - Upload dữ liệu đã chuẩn hóa lên Edge Impulse.
 - Chia dữ liệu theo tỷ lệ **80% training** và **20% testing**; tập test độc lập được dùng cho đánh giá cuối ở Chương 4.
-
-Không cần chạy lại script nếu chỉ muốn kiểm tra hoặc tái huấn luyện theo dữ liệu hiện có trong repo.
 
 ## 2. Cấu hình Impulse trên Edge Impulse
 
