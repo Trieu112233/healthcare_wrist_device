@@ -2,83 +2,96 @@
 
 ## 1. Dataset
 
-- **Nguồn dữ liệu:**  
-  Quá trình huấn luyện sử dụng hai tập dữ liệu âm thanh về tiếng la người và các tiếng động không phải tiếng la:
-  1. **Human Screaming Detection Dataset**  
-     - Gồm 2.831 mẫu âm thanh, độ dài mỗi mẫu từ 1 đến 10 giây (đa số là 10 giây), tần số lấy mẫu gốc 44,1 kHz.  
-     - Bao gồm cả positive và negative samples với các nhãn rõ ràng, ghi chú chi tiết về ứng dụng trong các hệ thống theo dõi sức khoẻ, bảo mật và khẩn cấp.
-  2. **Audio Dataset of Scream and Non Scream**  
-     - Phân loại rõ các file vào thư mục `scream` và `non_scream`, tổng dung lượng lên tới trên 500 MB, phù hợp cho các dự án AI hướng tới nhận diện sự kiện âm thanh đặc biệt.
+- **Nguồn dữ liệu:** tổng hợp từ hai bộ dữ liệu mở:
+  1. **Human Screaming Detection Dataset**.
+  2. **Audio Dataset of Scream and Non Scream**.
+- **Nhãn:** `scream` cho tiếng hét/kêu cứu và `non-scream` cho âm thanh sinh hoạt, tiếng ồn nền, tiếng nói chuyện bình thường.
+- **Thư mục dữ liệu dùng để huấn luyện trong repo:** `scream_dataset/Screaming` và `scream_dataset/NotScreaming`. Đây là dữ liệu đã được chuẩn hóa/tiền xử lý sẵn và có thể upload lên Edge Impulse trực tiếp.
+- **Script tiền xử lý:** `resample_audio.py`, giữ lại để minh họa/tái lập bước chuẩn hóa audio đã dùng trong đồ án.
 
-- **Tiền xử lý:**  
-  - Dữ liệu gốc có nhiều định dạng và tần số lấy mẫu khác nhau, được chuẩn hóa đồng bộ về tần số lấy mẫu 16 kHz bằng script `resample_audio.py`.
-  - Tất cả audio đều chuyển thành chuẩn mono PCM. Kết quả lưu theo cấu trúc thư mục gốc nhưng với thư mục đích riêng cho dữ liệu chuẩn.
-  - Sau đó, toàn bộ file audio đã chuẩn hóa được upload lên Edge Impulse, phân thành 2 class chính: "scream" và "non-scream".
-  - Dữ liệu được chia thành hai tập: training (80%) và test (20%).
+Quy trình tiền xử lý đã thực hiện và được thể hiện trong script:
+
+- Dữ liệu gốc có nhiều định dạng và tần số lấy mẫu khác nhau, ví dụ WAV/MP3 và 44,1 kHz.
+- Chuẩn hóa audio về **mono PCM**.
+- Hạ tần số lấy mẫu xuống **16 kHz** để đủ bao phủ dải giọng nói người và giảm chi phí xử lý trên vi điều khiển.
+- Upload dữ liệu đã chuẩn hóa lên Edge Impulse.
+- Chia dữ liệu theo tỷ lệ **80% training** và **20% testing**; tập test độc lập được dùng cho đánh giá cuối ở Chương 4.
+
+Không cần chạy lại script nếu chỉ muốn kiểm tra hoặc tái huấn luyện theo dữ liệu hiện có trong repo.
 
 ## 2. Cấu hình Impulse trên Edge Impulse
 
-- **Tín hiệu đầu vào:** Audio, sample rate 16 kHz.
-- **Cửa sổ phân tích (window size):** 1000 ms (1 giây).
-- **Stride:** 500 ms (cửa sổ trượt nửa giây).
-- **Xử lý dữ liệu:** Zero padding áp dụng tự động.
-- **Khối tiền xử lý đặc trưng:** MFCC với cấu hình:
-    - 13 hệ số MFCC.
-    - Frame length: 25 ms.
-    - Frame stride: 40 ms.
-    - 20 filter Mel.
-    - FFT size: 256.
-    - Chuẩn hóa đặc trưng trên cửa sổ 151 mẫu.
-    - Pre-emphasis coefficient: 0.98.
-    - Tần số cắt thấp: 80 Hz.
+- **Input:** audio 16 kHz.
+- **Window size:** 1000 ms.
+- **Window stride:** 500 ms.
+- **Zero-padding:** bật cho file quá ngắn.
+- **DSP block:** MFCC.
 
-## 3. Kiến trúc và quy trình huấn luyện mô hình
+Cấu hình MFCC:
 
-- **Thuật toán:** Mạng nơ-ron tích chập 1D (1D CNN) xử lý trực tiếp đặc trưng MFCC:
-    - Lớp Input 325 đặc trưng (từ MFCC).
-    - Reshape về ma trận (13 hệ số, số frame phù hợp với từng cửa sổ).
-    - 3 khối Conv1D nối tiếp với số lượng filter tăng dần (16, 32, 64 filter, kernel size = 3).
-    - Dropout sau mỗi conv để tránh overfitting (tỉ lệ dropout 0.25).
-    - Flatten, Dense 32 neurons, đầu ra softmax cho 2 lớp (scream, non-scream).
-- **Tham số huấn luyện:**
-    - Số training cycle: 100.
-    - Learning rate: 0.001.
-    - Batch size: 128.
-    - Auto-weight class tự động.
-    - Data augmentation: Thêm noise, che time/frequency bands (ở mức low).
-    - Tự profile model lượng tử hóa (int8) để benchmark hiệu năng.
+- **MFCC coefficients:** 13.
+- **Frame length:** 25 ms.
+- **Frame stride:** 40 ms.
+- **Mel filters:** 20.
+- **FFT size:** 256.
+- **Low-frequency cutoff:** 80 Hz.
+- **Pre-emphasis coefficient:** 0,98.
+- **Output features:** 325 đặc trưng đầu vào cho mạng học sâu.
 
-- **Chia dữ liệu:**  
-  80% training, 20% test (trên tổng số gần 4.000 file training, gần 900 file test).
+## 3. Kiến trúc và huấn luyện
+
+- **Mô hình:** 1D CNN trên đặc trưng MFCC.
+- **Input/Reshape:** 325 đặc trưng MFCC được reshape thành biểu diễn 2 chiều theo trục thời gian và hệ số.
+- **Conv blocks:** 3 lớp `Conv1D` nối tiếp với số filters tăng dần **16 -> 32 -> 64**, `kernel size = 3`, `padding = same`, activation `ReLU`.
+- **Dropout:** tỷ lệ **0,25** xen kẽ sau các khối tích chập.
+- **Classifier:** `Flatten` -> Dense 32 neurons -> Softmax 2 lớp.
+- **Classes:** `scream`, `non-scream`.
+- **Data augmentation:** noise injection và frequency masking.
+- **Class balancing:** Auto-weight class.
+- **Learning rate:** 0,001.
+- **Batch size:** 128.
+- **Epochs:** tối đa 100.
 
 ## 4. Hiệu năng và đánh giá
 
-- **Trên validation set:**
-    - Độ chính xác tổng thể (accuracy): 83.9%.
-    - Precision trung bình: 0.91.
-    - Recall trung bình: 0.84.
-    - F1-score trung bình: 0.86.
-- **Chi tiết confusion matrix:**
-    - Nhận diện đúng non-scream: 83.7%.
-    - Nhận diện đúng scream: 85.6%.
-    - Tỉ lệ nhầm lẫn (misclassify) với non-scream: 14.4%, với scream: 16.3%.
-- **Mô hình đã được lượng tử hóa int8**, inference nhanh, tận dụng tối đa bộ nhớ trên vi điều khiển.
-- **Thời gian inference end-to-end trên thiết bị:** MFCC: 236 ms, classifier: 10 ms, tổng cộng ~246 ms.
-- **RAM sử dụng (tối đa):** 17.9 KB.
-- **Flash (classifier):** 47.5 KB.
+### Validation trên Edge Impulse
 
-## 5. Triển khai trên thiết bị thực tế
+- **Accuracy:** 83,9%.
+- **Precision trung bình:** 0,91.
+- **Recall trung bình:** 0,84.
+- **F1-score trung bình:** 0,86.
+- **ROC-AUC:** 0,85.
+- **Recall lớp `scream`:** 85,6%.
+- **Recall lớp `non-scream`:** 83,7%.
 
-- **Target:** Mô hình xuất ra dưới dạng C++ library, hoàn toàn độc lập, có thể tích hợp trực tiếp vào chương trình nhúng, phù hợp mọi bộ biên dịch C++ hiện đại.
-- **Inference engine:** EON Compiler – tối ưu hiệu năng, giảm ~40% RAM, ~33% flash so với giải pháp thông thường.
-- **Hỗ trợ:** Có thể chạy tốt trên các vi điều khiển như ESP32-S3 và các hệ thống nhúng khác.
+### Test độc lập trong đồ án
+
+- **Accuracy:** 83,70%.
+- **Precision:** 91%.
+- **Recall:** 84%.
+- **F1-score:** 86%.
+- **AUC:** 85%.
+- **Confusion matrix:** `non-scream` dự đoán đúng 83,5%, nhầm sang `scream` 15,9%, `uncertain` 0,6%; `scream` dự đoán đúng 85,0%, nhầm sang `non-scream` 14,4%, `uncertain` 0,6%.
+
+### Profile Edge deployment
+
+- **Quantization:** int8.
+- **Inference time:** 246 ms cho một cửa sổ, gồm **236 ms DSP/MFCC** và **10 ms classifier**.
+- **Peak RAM:** 17,9 KB.
+- **Flash/ROM model:** 47,5 KB.
+- **Compiler:** EON Compiler.
+
+### Chạy thực tế trên firmware multi-impulse
+
+Khi đã tích hợp cùng mô hình phát hiện ngã trong firmware, mô hình tiếng hét tốn khoảng **27 ms** mỗi lần suy luận, gồm **24 ms DSP** và **3 ms classifier**.
+
+## 5. Triển khai
+
+Mô hình được xuất từ Edge Impulse dưới dạng C++ library, lượng tử hóa int8 và hợp nhất với mô hình Fall Detection bằng Multi-impulse Deployment Block. Thư viện cuối cùng được đưa vào firmware PlatformIO cho XIAO ESP32-S3.
 
 ## 6. Tài liệu tham khảo
 
-- **Script preprocess:** `model_training/scream_detection/resample_audio.py`
-- **Nguồn dữ liệu:**  
-  - Human Screaming Detection Dataset (`https://www.kaggle.com/datasets/whats2000/human-screaming-detection-dataset/data`)
-  - Audio Dataset of Scream and Non Scream (`https://www.kaggle.com/datasets/aananehsansiam/audio-dataset-of-scream-and-non-scream`)  
-- **Chi tiết tham số, kiến trúc tham khảo:** Edge Impulse project (`https://studio.edgeimpulse.com/public/916888/live`), pipeline đã trình bày trong tài liệu này.
-
----
+- Script minh họa tiền xử lý: `model_training/scream_detection/resample_audio.py`
+- Human Screaming Detection Dataset: https://www.kaggle.com/datasets/whats2000/human-screaming-detection-dataset/data
+- Audio Dataset of Scream and Non Scream: https://www.kaggle.com/datasets/aananehsansiam/audio-dataset-of-scream-and-non-scream
+- Edge Impulse project: https://studio.edgeimpulse.com/public/916888/live

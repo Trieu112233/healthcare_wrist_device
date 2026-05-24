@@ -3,9 +3,12 @@ import librosa
 import soundfile as sf
 from tqdm import tqdm
 
+# Script minh họa/tái lập quy trình chuẩn hóa audio; dữ liệu trong scream_dataset
+# của repo đã được tiền xử lý sẵn, không cần chạy lại nếu chỉ huấn luyện lại model.
 # Cấu hình đường dẫn
-input_root_dir = 'archive'
-output_root_dir = 'archive_16k'
+base_dir = os.path.dirname(__file__)
+input_root_dir = os.path.join(base_dir, 'scream_dataset')
+output_root_dir = os.path.join(base_dir, 'scream_dataset_16k')
 target_sr = 16000  # Tần số mẫu mục tiêu cho Edge Impulse
 
 def resample_dataset(input_dir, output_dir, sr):

@@ -2,59 +2,42 @@
 
 ## Tổng quan
 
-Dự án này hiện thực việc nhận diện đồng thời hai hiện tượng quan trọng trong chăm sóc sức khoẻ thông minh:  
-- **Phát hiện ngã (Fall Detection)**
-- **Phát hiện tiếng la (Scream Detection)**
+Thư mục này chứa dữ liệu đã tiền xử lý và mô tả quy trình huấn luyện hai mô hình TinyML dùng trong đồ án:
 
-Mỗi mô hình được xây dựng, huấn luyện và đánh giá độc lập trên Edge Impulse (sử dụng dữ liệu riêng, pipeline đặc thù cho từng nhiệm vụ). Yêu cầu của hệ thống là phải triển khai song song hai mô hình trên cùng một thiết bị nhúng XIAO ESP32-S3 với hiệu năng tối ưu và bộ nhớ hạn chế.
+- **Phát hiện ngã (Fall Detection)** từ dữ liệu IMU 6 trục.
+- **Phát hiện tiếng hét/kêu cứu (Scream Detection)** từ tín hiệu âm thanh.
+
+Hai mô hình được xây dựng, huấn luyện, đánh giá và lượng tử hóa độc lập trên Edge Impulse, sau đó được hợp nhất để chạy song song trên thiết bị XIAO ESP32-S3.
+
+## Cấu trúc thư mục
+
+- `fall_detection/`: dữ liệu WEDA-FALL đã tiền xử lý, script minh họa quy trình tiền xử lý và tài liệu mô hình phát hiện ngã.
+- `scream_detection/`: dữ liệu âm thanh đã chuẩn hóa, script minh họa quy trình chuẩn hóa âm thanh và tài liệu mô hình phát hiện tiếng hét.
+
+Lưu ý: hai script Python trong các thư mục con được giữ lại để trình bày/tái lập quy trình với giảng viên. Dữ liệu đang đặt trong repo đã là dữ liệu sau tiền xử lý, không cần chạy lại script trước khi upload lên Edge Impulse.
 
 ## Giải pháp hợp nhất mô hình
 
-Để hiện thực multi-task AI trên thiết bị nhúng, các mô hình được xuất ra dưới dạng C++ library và kết hợp lại thành **một thư viện duy nhất** nhờ tận dụng bộ công cụ mã nguồn mở [edgeimpulse/multi-impulse-deployment-block](https://github.com/edgeimpulse/multi-impulse-deployment-block) của Edge Impulse.
+Đồ án sử dụng công cụ mã nguồn mở [edgeimpulse/multi-impulse-deployment-block](https://github.com/edgeimpulse/multi-impulse-deployment-block) để hợp nhất hai C++ library xuất từ Edge Impulse thành một thư viện duy nhất.
 
-Kiến trúc này cho phép:
-- Tích hợp nhiều mô hình inference vào chung một binary/firmware.
-- Dữ liệu cảm biến hoặc tín hiệu audio được tự động định tuyến đến đúng mô hình.
-- Quản lý tài nguyên bộ nhớ, RAM và flash tốt nhờ EON Compiler.
+Mục tiêu của bước này:
 
-## Cách tổ chức và cấu trúc
-
-1. **Mỗi mô hình AI** được phát triển, đánh giá, xuất ra C++ library riêng biệt từ Edge Impulse.
-2. **Hợp nhất mô hình**:  
-    Hai thư viện C++ được tổ chức lại trong cấu trúc chuẩn theo khung của Edge Impulse Multi-Impulse.  
-    Hệ thống tạo một bộ API duy nhất cho phép gọi từng mô hình theo tên/class đã đăng ký.
-3. **Nội dung thư viện hợp nhất**:
-    - Chứa toàn bộ mã nguồn, weight, tham số của từng mô hình.
-    - Giữ namespace riêng biệt, không xung đột tài nguyên/hàm.
-    - Có cấu hình định tuyến input (audio chuyển về scream, imu chuyển về fall...).
-4. **Triển khai**:  
-    Bộ thư viện cuối cùng được nạp lên vi điều khiển bằng nền tảng Platform IO.
+- Tránh lỗi `Multiple Definition` khi đưa hai thư viện Edge Impulse riêng lẻ vào cùng firmware.
+- Cô lập namespace và biến số của từng mô hình.
+- Loại bỏ các khối xử lý lõi bị trùng lặp.
+- Cung cấp API định tuyến: dữ liệu IMU đi vào mô hình Fall, dữ liệu microphone đi vào mô hình Scream.
 
 ## Quy trình tổng quát
 
-### Bước 1: Chuẩn bị trên Edge Impulse Studio
+### 1. Chuẩn bị trên Edge Impulse Studio
 
-1. Vào từng project (ví dụ: Fall Detection, Scream Detection).
-2. Vào **Dashboard → Keys** để lấy các mã API Key. Bạn cần copy đầy đủ từng key cho mỗi project.
-3. Đảm bảo dự án Edge Impulse đã cấu hình **Quantization: Quantized (int8)** phù hợp với vi điều khiển (ESP32-S3).
+1. Tạo hai project độc lập: Fall Detection và Scream Detection.
+2. Vào **Dashboard -> Keys** để lấy API key của từng project.
+3. Xuất model ở chế độ **Quantized (int8)** và bật **EON Compiler** để tối ưu cho ESP32-S3.
 
-### Bước 2: Thiết lập môi trường Local
+### 2. Sinh thư viện multi-impulse
 
-1. Chuẩn bị môi trường sạch:
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-2. Di chuyển vào thư mục chứa mã nguồn `multi-impulse-deployment-block`.
-3. Cài đặt các thư viện cần thiết:
-    ```bash
-    pip install -r requirements.txt
-    ```
-    > Nếu thiếu file này, hãy đảm bảo có `requests` và các lib Python cho thao tác file.
-
-### Bước 3: Chạy script hợp nhất (generate)
-
-Chạy lệnh sau, thay KEY_CUA_FALL, KEY_CUA_SCREAM bằng API Key thực tế bạn lấy ở Bước 1:
+Chạy trong thư mục của `multi-impulse-deployment-block`:
 
 ```bash
 python3 generate.py --out-directory ./output \
@@ -63,21 +46,23 @@ python3 generate.py --out-directory ./output \
     --force-build
 ```
 
-- `--api-keys`: API keys của các project, phân cách bởi dấu phẩy.
-- `--quantization-map`: Ví dụ `1,1` nếu tất cả đều Quantized (int8); dùng `0` nếu xuất dạng float.
-- `--force-build`: Yêu cầu Edge Impulse build firmware mới nhất mỗi lần, tránh lỗi cache.
+- `--api-keys`: API keys của hai project, phân cách bằng dấu phẩy.
+- `--quantization-map 1,1`: ép cả hai mô hình dùng định dạng int8.
+- `--force-build`: yêu cầu Edge Impulse build lại artifact mới nhất.
 
-### Bước 4: Xử lý file đầu ra và tích hợp lên ESP32-S3
+Sau khi hoàn tất, file `deploy.zip` trong `output/` được giải nén và tích hợp vào firmware PlatformIO.
 
-1. Sau khi script chạy xong sẽ nhận được một file `deploy.zip` trong thư mục `output/`.
-2. Giải nén file này ra sẽ được cấu trúc một thư viện C++ đầy đủ gồm 2 mô hình.
+## Kết quả khớp với đồ án
+
+- Mô hình Fall Detection trên tập test độc lập đạt accuracy **85,96%**, precision **87%**, recall **86%**, F1-score **86%**, AUC **84%**.
+- Mô hình Scream Detection trên tập test độc lập đạt accuracy **83,70%**, precision **91%**, recall **84%**, F1-score **86%**, AUC **85%**.
+- Firmware đã gồm cả hai mô hình int8 chiếm **2,06 MB flash**.
+- RAM tĩnh theo PlatformIO là **141,8 KB**; RAM động sau suy luận khoảng **117,5 KB**; peak RAM khi chạy AI khoảng **125,2 KB**.
+- Thời gian suy luận thực tế trong firmware: Fall **173 ms**, Scream **27 ms**, tổng mỗi chu kỳ AI khoảng **200 ms**.
 
 ## Tham khảo
 
-- Repo hợp nhất chuẩn: [edgeimpulse/multi-impulse-deployment-block](https://github.com/edgeimpulse/multi-impulse-deployment-block)  
-- Chi tiết technical: [Edge Impulse Multiple Impulses Guide](https://docs.edgeimpulse.com/tutorials/topics/inference/run-multiple-impulses-cpp#locally)
-
----
-
-**Tóm lại:**  
-Dự án triển khai kiến trúc multi-impulse, cho phép phát hiện ngã và tiếng la đồng thời trên cùng một thiết bị nhúng với hiệu năng cao, dễ bảo trì, nâng cấp và tích hợp mở rộng về sau.
+- `fall_detection/README.md`
+- `scream_detection/README.md`
+- [edgeimpulse/multi-impulse-deployment-block](https://github.com/edgeimpulse/multi-impulse-deployment-block)
+- [Edge Impulse Multiple Impulses Guide](https://docs.edgeimpulse.com/tutorials/topics/inference/run-multiple-impulses-cpp#locally)

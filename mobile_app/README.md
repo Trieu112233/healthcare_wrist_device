@@ -2,7 +2,7 @@
 
 ## Tổng Quan
 
-`SmartWatchApp` là ứng dụng Android đi kèm hệ thống vòng tay chăm sóc sức khỏe. Ứng dụng dùng Firestore để đăng nhập, quản lý danh sách thiết bị và nhận cảnh báo khẩn cấp theo thời gian thực.
+`SmartWatchApp` là ứng dụng Android đi kèm hệ thống đeo tay chăm sóc sức khỏe. Ứng dụng dùng Firestore để đăng nhập, quản lý danh sách thiết bị và nhận cảnh báo khẩn cấp theo thời gian thực.
 
 Thông tin chính:
 
@@ -16,8 +16,6 @@ Thông tin chính:
 | Ngôn ngữ | Java |
 | Công cụ build | Gradle Kotlin DSL |
 | Backend | Firebase Firestore |
-
-Ứng dụng hiện chưa dùng Firebase Authentication. Phần đăng nhập kiểm tra trực tiếp document trong collection `users`.
 
 ## Cấu Trúc Project
 
@@ -121,8 +119,6 @@ Chức năng:
 - Tạo document mới trong `users/{phone}`.
 - Lưu `Name`, `password`, `DeviceId`.
 - `DeviceId` được khởi tạo là mảng rỗng.
-
-Ghi chú: mật khẩu hiện được lưu trực tiếp để phục vụ demo/MVP. Nếu triển khai thật, nên dùng Firebase Auth hoặc hash mật khẩu.
 
 ### `MainActivity`
 
@@ -279,7 +275,7 @@ Manifest hiện khai báo:
 | Android 6+ | Quyền hiển thị trên ứng dụng khác |
 | Android 6+ | Bỏ qua tối ưu pin |
 
-Luồng cảnh báo chính dùng full-screen notification. Quyền hiển thị trên ứng dụng khác vẫn được kiểm tra, nhưng app hiện không tự vẽ overlay riêng.
+Luồng cảnh báo chính dùng full-screen notification. 
 
 ## Cấu Hình Build
 

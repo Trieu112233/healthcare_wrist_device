@@ -7,8 +7,10 @@ from scipy.interpolate import interp1d
 
 warnings.filterwarnings('ignore')
 
+# Script minh họa/tái lập quy trình tiền xử lý; dữ liệu trong processed_individual
+# của repo đã được tiền xử lý sẵn, không cần chạy lại nếu chỉ huấn luyện lại model.
 # --- CẤU HÌNH ---
-BASE_PATH = "/home/trieu/Documents/dataset_fall+adl/WEDA-FALL-main/dataset"
+BASE_PATH = os.path.join(os.path.dirname(__file__), "WEDA-FALL-main", "dataset")
 TARGET_FREQ = "50Hz"
 FREQ_INTERVAL = 0.02  # 50Hz
 OUTPUT_DIR = os.path.join(BASE_PATH, "processed_individual") # Thư mục mới cho file lẻ
