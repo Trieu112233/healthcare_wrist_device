@@ -152,4 +152,4 @@ MQTT Input → Parse JSON → Validate → Firestore Update
 
 ---
 
-**Phục vụ cho khóa luận tốt nghiệp
+**Phục vụ cho đồ án tốt nghiệp
