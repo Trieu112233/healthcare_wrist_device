@@ -1,45 +1,47 @@
-# 🏗️ System Architecture 
+# Kiến trúc hệ thống
 
-## Kiến Trúc Tổng Thể
+## Tổng quan
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    HEALTHCARE WRISTBAND SYSTEM                  │
+│          HỆ THỐNG VÒNG ĐEO TAY CHĂM SÓC SỨC KHỎE                │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌──────────────┐         ┌──────────────┐         ┌──────────────┐
 │   ESP32-S3   │ ──WiFi──│  HiveMQ IoT  │ ──HTTP──│  Node-RED    │
-│   Wearable   │  MQTT   │   Broker     │ Flows   │   Server     │
+│ Thiết bị đeo │  MQTT   │   Broker     │  Flow   │   Server     │
 └──────────────┘         └──────────────┘         └──────────────┘
       │                                                    │
-      │ (Fall + Scream                                    │
-      │  Detection Alert)                  ┌──────────────┴
-      │                                     │                        
-      │                            ┌────────▼────────┐     
-      │                            │  Firestore DB   │      
-      │                            │  (Real-time)    │      
-      │                            └─────────┬───────┘      
+      │ (Cảnh báo phát hiện                               │
+      │  ngã + tiếng hét)                  ┌──────────────┴
+      │                                     │
+      │                            ┌────────▼────────┐
+      │                            │  Firestore DB   │
+      │                            │  (thời gian thực)│
+      │                            └─────────┬───────┘
       │                                      │
       │                            ┌─────────┴
-      │                            │                    
-      │                    ┌───────▼──────┐    
-      │                    │ Mobile App   │    
-      │                    │ (Android)    │    
-      │                    └──────────────┘    
+      │                            │
+      │                    ┌───────▼──────┐
+      │                    │ Ứng dụng     │
+      │                    │ Android      │
+      │                    └──────────────┘
 ```
 
-## Components Chi Tiết
+## Các thành phần chính
 
-### 1. **Embedded System (ESP32-S3 Wearable)**
+### 1. Hệ thống nhúng ESP32-S3
 
 **Chức năng:**
-- Đọc dữ liệu từ IMU (LSM6DS3) ở 50Hz
-- Thu âm từ microphone (INMP441) ở 16kHz
-- Chạy 2 mô hình ML (Fall + Scream Detection)
-- Hiển thị UI trên màn hình tròn GC9A01
-- Kết nối WiFi & gửi cảnh báo qua MQTT
 
-**Output MQTT:**
+- Đọc dữ liệu từ cảm biến IMU LSM6DS3 ở tần số 50 Hz.
+- Thu âm từ microphone INMP441 ở tần số 16 kHz.
+- Chạy 2 mô hình học máy: phát hiện ngã và phát hiện tiếng hét.
+- Hiển thị giao diện trên màn hình tròn GC9A01.
+- Kết nối WiFi và gửi cảnh báo qua MQTT.
+
+**Dữ liệu MQTT gửi đi:**
+
 ```json
 {
   "deviceId": "xiao_esp32s3_01",
@@ -48,44 +50,49 @@
 }
 ```
 
-**Files:** `multi_model/src/`
+**Thư mục mã nguồn:** `multi_model/src/`
 
 ---
 
-### 2. **IoT Broker (HiveMQ Cloud)**
+### 2. Broker IoT HiveMQ Cloud
 
 **Chức năng:**
-- Nhận MQTT messages từ wearable device
-- Định tuyến tới Node-RED
-- Bảo mật TLS/SSL
 
-**Configuration:**
-- Port: 8883 (TLS)
-- Topic: `healthcare/alert`
+- Nhận bản tin MQTT từ thiết bị đeo.
+- Chuyển tiếp dữ liệu đến Node-RED.
+- Bảo mật kết nối bằng TLS/SSL.
+
+**Cấu hình:**
+
+- Port: 8883 (TLS).
+- Topic: `healthcare/alert`.
 
 ---
 
-### 3. **Data Processing (Node-RED)**
+### 3. Xử lý dữ liệu bằng Node-RED
 
 **Chức năng:**
-- Parse JSON từ MQTT
-- Validate confidence threshold (≥ 0.80)
-- Update Firestore devices collection
 
-**Flow:**
+- Phân tích JSON nhận từ MQTT.
+- Kiểm tra ngưỡng tin cậy của cảnh báo (`confidence >= 0.80`).
+- Cập nhật collection `devices` trên Firestore.
+
+**Luồng xử lý:**
+
 ```
-MQTT Input → Parse JSON → Validate → Firestore Update
+MQTT Input -> Parse JSON -> Validate -> Firestore Update
 ```
 
-**File:** `node-red/flows.json`
+**File cấu hình:** `node-red/flows.json`
 
 ---
 
-### 4. **Database (Firestore)**
+### 4. Cơ sở dữ liệu Firestore
 
-**Collections thực tế:**
+**Các collection thực tế:**
 
-#### users
+#### `users`
+
 ```json
 {
   "_id": "0122345678",
@@ -95,7 +102,8 @@ MQTT Input → Parse JSON → Validate → Firestore Update
 }
 ```
 
-#### devices
+#### `devices`
+
 ```json
 {
   "_id": "xiao_esp32s3_01",
@@ -103,53 +111,54 @@ MQTT Input → Parse JSON → Validate → Firestore Update
   "is_online": true,
   "alert": false,
   "alert_type": "TIENG_HET_LON",
-  "last_alert_time": Timestamp,
+  "last_alert_time": "Timestamp",
   "phone": ["0122345678"]
 }
 ```
 
 ---
 
-### 5. **Mobile Application (Android)**
+### 5. Ứng dụng di động Android
 
 **Chức năng:**
-- Đăng nhập người dùng
-- Quản lý danh sách thiết bị
-- Real-time monitoring
-- Nhận cảnh báo khẩn cấp
 
-**Tech Stack:**
-- Android Studio
-- Firebase Authentication
-- Firestore Realtime Database
+- Đăng nhập người dùng.
+- Quản lý danh sách thiết bị được liên kết.
+- Theo dõi trạng thái thiết bị theo thời gian thực.
+- Nhận và hiển thị cảnh báo khẩn cấp.
 
-**Files:** `mobile_app/smartWatchApp/`
+**Công nghệ sử dụng:**
+
+- Android Studio.
+- Firebase Authentication.
+- Firestore Realtime Database.
+
+**Thư mục mã nguồn:** `mobile_app/smartWatchApp/`
 
 ---
 
-## Data Flow
+## Luồng dữ liệu cảnh báo
 
-### Alert Flow
 ```
-1. WEARABLE (ESP32-S3)
-   └─ ML Inference: confidence ≥ 0.80?
-   └─ YES → Publish MQTT
+1. THIẾT BỊ ĐEO ESP32-S3
+   └─ Chạy suy luận AI: confidence >= 0.80?
+   └─ Có -> Gửi bản tin MQTT
 
 2. HIVEMQ BROKER
-   └─ Route to Node-RED
+   └─ Chuyển tiếp dữ liệu đến Node-RED
 
 3. NODE-RED
-   └─ Parse & Validate
-   └─ Update Firestore
+   └─ Phân tích và kiểm tra dữ liệu
+   └─ Cập nhật Firestore
 
 4. FIRESTORE
-   └─ Update devices/{deviceId}
-   └─ Trigger Realtime Listeners
+   └─ Cập nhật devices/{deviceId}
+   └─ Kích hoạt realtime listeners
 
-5. MOBILE APP
-   └─ Show alert screen
+5. ỨNG DỤNG ANDROID
+   └─ Hiển thị màn hình cảnh báo
 ```
 
 ---
 
-**Phục vụ cho đồ án tốt nghiệp
+Tài liệu phục vụ cho đồ án tốt nghiệp.
