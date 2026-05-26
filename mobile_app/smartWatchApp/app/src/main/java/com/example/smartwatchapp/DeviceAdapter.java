@@ -2,7 +2,9 @@ package com.example.smartwatchapp;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +20,8 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.util.List;
 
 public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder> {
+    private static final String ESP_BLE_PROV_PACKAGE = "com.espressif.provble";
+
     private final List<Device> deviceList;
 
     public DeviceAdapter(List<Device> deviceList){
@@ -49,9 +53,44 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.DeviceView
         }
 
         holder.itemView.setOnLongClickListener(v -> {
-            showDeleteDialog(v.getContext(), device.getId());
+            showDeviceOptions(v.getContext(), device.getId());
             return true;
         });
+    }
+
+    private void showDeviceOptions(Context context, String deviceId) {
+        String[] options = {"Mở ESP BLE Prov", "Xóa thiết bị"};
+        new AlertDialog.Builder(context)
+                .setTitle(deviceId != null ? deviceId : "Thiết bị")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        openEspBleProvApp(context);
+                    } else {
+                        showDeleteDialog(context, deviceId);
+                    }
+                })
+                .show();
+    }
+
+    private void openEspBleProvApp(Context context) {
+        Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(ESP_BLE_PROV_PACKAGE);
+        if (launchIntent != null) {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(launchIntent);
+            return;
+        }
+
+        Intent storeIntent = new Intent(Intent.ACTION_VIEW,
+                Uri.parse("market://details?id=" + ESP_BLE_PROV_PACKAGE));
+        storeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            context.startActivity(storeIntent);
+        } catch (Exception e) {
+            Intent webIntent = new Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://play.google.com/store/apps/details?id=" + ESP_BLE_PROV_PACKAGE));
+            webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(webIntent);
+        }
     }
 
     private void showDeleteDialog(Context context, String deviceId) {
