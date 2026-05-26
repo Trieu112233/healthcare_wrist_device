@@ -12,7 +12,6 @@ Firmware này chạy trên **Seeed Studio XIAO ESP32-S3** bằng **Arduino + Pla
 | Display | GC9A01 240x240 qua SPI, LVGL 8.3.11, LovyanGFX |
 | ML runtime | Edge Impulse SDK, compiled TFLite/EON models |
 | Kết nối | WiFi STA, BLE provisioning, MQTT qua `WiFiClientSecure` |
-| Ngưỡng cảnh báo | `ALERT_THRESHOLD = 0.80f` |
 
 ## II. Cấu Trúc Firmware
 
@@ -60,7 +59,7 @@ firmware/
 - Chân I2S: `WS=D9`, `SCK=D1`, `SD=D6`
 - I2S port: `I2S_NUM_0`
 - Sample rate: `16000 Hz`
-- I2S input: 32-bit, lấy `raw >> 16` thành `int16_t`
+- I2S input: 32-bit, lấy `raw >> 14` thành `int16_t`
 - Buffer: `AUDIO_SAMPLES_PER_CYCLE = 16000`, tương đương 1 giây
 - Task: `Mic_Task`, stack `8192`, priority `3`, pinned core `1`
 - Chế độ buffer hiện tại là single-buffer: task microphone chờ AI đọc xong rồi mới ghi cửa sổ audio tiếp theo.
@@ -81,7 +80,7 @@ Quy trình trong `run_ai_inference()`:
 3. Chạy `run_classifier(&impulse_handle_916888_1, ...)`.
 4. Lấy confidence của label `fall` và `scream`.
 5. Gọi `updateAlertUI(fall, scream)`.
-6. Nếu một trong hai confidence `>= 0.80`, gọi `publishAlert(fall, scream)`.
+6. Nếu một trong hai confidence `>= threshold`, gọi `publishAlert(fall, scream)`.
 
 ## VI. Network, BLE Provisioning Và MQTT
 
@@ -97,7 +96,7 @@ Quy trình trong `run_ai_inference()`:
 
 - Scheme: `WIFI_PROV_SCHEME_BLE`
 - Security: `WIFI_PROV_SECURITY_1`
-- Service name: `ESP32S3_01`
+- Service name: `Prov_xiao_esp32s3_01`
 - PoP: `12345678`
 - Khi provisioning thành công, firmware lưu credentials vào NVS và restart.
 
@@ -150,10 +149,10 @@ Trạng thái UI:
 
 | Điều kiện | Text |
 | --- | --- |
-| Fall < 0.80 và Scream < 0.80 | `SAFE` |
+| Fall < 0.80 và Scream < 0.50 | `SAFE` |
 | Fall >= 0.80 | `FALL !!!` |
-| Scream >= 0.80 | `SCREAM !!!` |
-| Fall >= 0.80 và Scream >= 0.80 | `FALL AND SCREAM !!!` |
+| Scream >= 0.50 | `SCREAM !!!` |
+| Fall >= 0.80 và Scream >= 0.50 | `FALL AND SCREAM !!!` |
 
 ## VIII. Luồng Hoạt Động
 

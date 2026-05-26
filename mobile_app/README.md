@@ -170,7 +170,7 @@ ID: xiao_esp32s3_01
 
 Tương tác:
 
-- Nhấn giữ item để xóa thiết bị khỏi user hiện tại.
+- Nhấn giữ item để xóa thiết bị khỏi user hiện tại hoặc chuyển sang app ESP BLE Prov để cấu hình Wi-Fi cho thiết bị.
 - Thao tác xóa chỉ remove id khỏi `users/{phone}.DeviceId`, không xóa document trong `devices`.
 
 ### `FirestoreAlertService`

@@ -14,7 +14,7 @@ static const unsigned long SLEEP_TIMEOUT = 20000;
 static const float MOTION_THRESHOLD = 0.15f;
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(115200); 
     delay(100);
 
     setupDisplay();

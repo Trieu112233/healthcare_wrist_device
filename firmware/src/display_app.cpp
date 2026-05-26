@@ -57,13 +57,16 @@ void setupDisplay() {
 void updateAlertUI(float fall_conf, float scream_conf) {
     int current_state = 0;
 
-    if (fall_conf < ALERT_THRESHOLD && scream_conf < ALERT_THRESHOLD) {
+    bool fallAlert = fall_conf >= FALL_ALERT_THRESHOLD;
+    bool screamAlert = scream_conf >= SCREAM_ALERT_THRESHOLD;
+
+    if (!fallAlert && !screamAlert) {
         current_state = 0;
-    } else if (fall_conf >= ALERT_THRESHOLD && scream_conf >= ALERT_THRESHOLD) {
+    } else if (fallAlert && screamAlert) {
         current_state = 1;
-    } else if (scream_conf >= ALERT_THRESHOLD && fall_conf < ALERT_THRESHOLD) {
+    } else if (screamAlert) {
         current_state = 2;
-    } else if (fall_conf >= ALERT_THRESHOLD && scream_conf < ALERT_THRESHOLD) {
+    } else if (fallAlert) {
         current_state = 3;
     }
 

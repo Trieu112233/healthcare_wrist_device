@@ -29,17 +29,17 @@ Cấu hình MFCC:
 
 - **MFCC coefficients:** 13.
 - **Frame length:** 25 ms.
-- **Frame stride:** 40 ms.
-- **Mel filters:** 20.
-- **FFT size:** 256.
+- **Frame stride:** 20 ms.
+- **Mel filters:** 32.
+- **FFT size:** 512.
 - **Low-frequency cutoff:** 80 Hz.
 - **Pre-emphasis coefficient:** 0,98.
-- **Output features:** 325 đặc trưng đầu vào cho mạng học sâu.
+- **Output features:** 637 đặc trưng đầu vào cho mạng học sâu.
 
 ## 3. Kiến trúc và huấn luyện
 
 - **Mô hình:** 1D CNN trên đặc trưng MFCC.
-- **Input/Reshape:** 325 đặc trưng MFCC được reshape thành biểu diễn 2 chiều theo trục thời gian và hệ số.
+- **Input/Reshape:** 637 đặc trưng MFCC được reshape thành biểu diễn 2 chiều theo trục thời gian và hệ số.
 - **Conv blocks:** 3 lớp `Conv1D` nối tiếp với số filters tăng dần **16 -> 32 -> 64**, `kernel size = 3`, `padding = same`, activation `ReLU`.
 - **Dropout:** tỷ lệ **0,25** xen kẽ sau các khối tích chập.
 - **Classifier:** `Flatten` -> Dense 32 neurons -> Softmax 2 lớp.
@@ -54,29 +54,29 @@ Cấu hình MFCC:
 
 ### Validation trên Edge Impulse
 
-- **Accuracy:** 83,9%.
-- **Precision trung bình:** 0,91.
-- **Recall trung bình:** 0,84.
-- **F1-score trung bình:** 0,86.
-- **ROC-AUC:** 0,85.
-- **Recall lớp `scream`:** 85,6%.
-- **Recall lớp `non-scream`:** 83,7%.
+- **Accuracy:** 89,2%.
+- **Precision trung bình:** 0,92.
+- **Recall trung bình:** 0,89.
+- **F1-score trung bình:** 0,90.
+- **ROC-AUC:** 0,87.
+- **Recall lớp `scream`:** 84,8%.
+- **Recall lớp `non-scream`:** 89,8%.
 
 ### Test độc lập trong đồ án
 
-- **Accuracy:** 83,70%.
-- **Precision:** 91%.
-- **Recall:** 84%.
-- **F1-score:** 86%.
-- **AUC:** 85%.
-- **Confusion matrix:** `non-scream` dự đoán đúng 83,5%, nhầm sang `scream` 15,9%, `uncertain` 0,6%; `scream` dự đoán đúng 85,0%, nhầm sang `non-scream` 14,4%, `uncertain` 0,6%.
+- **Accuracy:** 89,23%.
+- **Precision:** 92%.
+- **Recall:** 90%.
+- **F1-score:** 90%.
+- **AUC:** 86%.
+- **Confusion matrix:** `non-scream` dự đoán đúng 90,3%, nhầm sang `scream` 9,4%, `uncertain` 0,3%; `scream` dự đoán đúng 82,1%, nhầm sang `non-scream` 17,6%, `uncertain` 0,3%.
 
 ### Profile Edge deployment
 
 - **Quantization:** int8.
-- **Inference time:** 246 ms cho một cửa sổ, gồm **236 ms DSP/MFCC** và **10 ms classifier**.
-- **Peak RAM:** 17,9 KB.
-- **Flash/ROM model:** 47,5 KB.
+- **Inference time:** 15 ms classifier.
+- **Peak RAM:** 21,7 KB.
+- **Flash/ROM model:** 57,2 KB.
 - **Compiler:** EON Compiler.
 
 ### Chạy thực tế trên firmware multi-impulse

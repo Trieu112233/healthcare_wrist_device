@@ -28,6 +28,10 @@ TaskHandle_t micTaskHandle = NULL;
 
 volatile bool audioDataReady = false;
 
+static inline int16_t convertI2SSample(int32_t rawSample) {
+    return (int16_t)(rawSample >> 14);
+}
+
 void setupI2S() {
     updateStatusUI("I2S: starting");
 
@@ -38,8 +42,8 @@ void setupI2S() {
         .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
         .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-        .dma_buf_count = 4,
-        .dma_buf_len = 128,
+        .dma_buf_count = 8,
+        .dma_buf_len = 1024,
         .use_apll = false,
         .tx_desc_auto_clear = false,
         .fixed_mclk = 0
@@ -132,18 +136,25 @@ void setupIMU() {
 }
 
 void micTask(void *pvParameters) {
-    int32_t raw_buf[256];
+    int32_t raw_buf[1024];
     size_t bytes_read;
 
     while (1) {
         int samples_captured = 0;
+        int16_t min_sample = INT16_MAX;
+        int16_t max_sample = INT16_MIN;
+        int64_t sum_squares = 0;
         
         while (samples_captured < AUDIO_SAMPLES_PER_CYCLE) {
             esp_err_t result = i2s_read(I2S_PORT, &raw_buf, sizeof(raw_buf), &bytes_read, portMAX_DELAY);
             if (result == ESP_OK && bytes_read > 0) {
                 int samples_read = bytes_read / sizeof(int32_t);
                 for (int i = 0; i < samples_read && samples_captured < AUDIO_SAMPLES_PER_CYCLE; i++) {
-                    audioBuffer[samples_captured] = (int16_t)(raw_buf[i] >> 16);
+                    int16_t sample = convertI2SSample(raw_buf[i]);
+                    audioBuffer[samples_captured] = sample;
+                    if (sample < min_sample) min_sample = sample;
+                    if (sample > max_sample) max_sample = sample;
+                    sum_squares += (int32_t)sample * (int32_t)sample;
                     samples_captured++;
                 }
             }
@@ -155,7 +166,12 @@ void micTask(void *pvParameters) {
         portEXIT_CRITICAL(&dataReadyMutex);
 
         portENTER_CRITICAL(&serialMutex);
-        Serial.println("[MIC] Audio buffer ready");
+        int min_peak = abs((int)min_sample);
+        int max_peak = abs((int)max_sample);
+        int peak = (min_peak > max_peak) ? min_peak : max_peak;
+        float rms = sqrtf((float)sum_squares / (float)AUDIO_SAMPLES_PER_CYCLE);
+        Serial.printf("[MIC] Audio buffer ready min=%d max=%d peak=%d rms=%.1f shift=16\n",
+                      min_sample, max_sample, peak, rms);
         portEXIT_CRITICAL(&serialMutex);
 
         // Single-buffer mode: keep the audio window stable while AI consumes it.

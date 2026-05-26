@@ -41,7 +41,7 @@ Không cần chạy lại script nếu chỉ muốn kiểm tra hoặc tái huấ
 - **Loss:** Focal Loss với `gamma = 2.0`, `alpha = 0.25`.
 - **Optimizer:** Adam, learning rate **0,0005**, `beta1 = 0,9`, `beta2 = 0,999`.
 - **Batch size:** 128.
-- **Epochs:** tối đa 100.
+- **Epochs:** tối đa 150.
 
 ## 4. Hiệu năng và đánh giá
 
@@ -67,7 +67,7 @@ Các lỗi chủ yếu xuất hiện ở dữ liệu vung tay mạnh, hoạt đ�
 ### Profile Edge deployment
 
 - **Quantization:** int8.
-- **Inference time:** 586 ms cho một cửa sổ.
+- **Inference time:** 214 ms cho một cửa sổ.
 - **Peak RAM:** 31,2 KB.
 - **Flash/ROM model:** 72,3 KB.
 - **Compiler:** EON Compiler.

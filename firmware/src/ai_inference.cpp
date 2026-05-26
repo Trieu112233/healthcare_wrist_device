@@ -145,7 +145,7 @@ void run_ai_inference() {
 
     updateAlertUI(actFall, actScream);
 
-    if (actFall >= ALERT_THRESHOLD || actScream >= ALERT_THRESHOLD) {
+    if (actFall >= FALL_ALERT_THRESHOLD || actScream >= SCREAM_ALERT_THRESHOLD) {
         publishAlert(actFall, actScream);
     }
     

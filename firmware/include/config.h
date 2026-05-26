@@ -26,6 +26,7 @@
 #define TFT_DC    D3
 #define TFT_RST   -1
 
-#define ALERT_THRESHOLD 0.80f
+#define FALL_ALERT_THRESHOLD    0.80f
+#define SCREAM_ALERT_THRESHOLD  0.50f
 
 #endif

@@ -2,7 +2,7 @@
 
 ## Tổng Quan
 
-Flow Node-RED này nhận cảnh báo từ thiết bị ESP32-S3 qua MQTT, lọc dữ liệu cảnh báo, ghi trạng thái cảnh báo vào Firestore, và đo độ trễ từ lúc nhận MQTT đến sau khi ghi Firestore.
+Flow Node-RED này nhận cảnh báo từ thiết bị ESP32-S3 qua MQTT, lọc dữ liệu theo ngưỡng phát hiện ngã/tiếng hét, ghi trạng thái cảnh báo vào Firestore, và đo độ trễ từ lúc nhận MQTT đến sau khi ghi Firestore.
 
 Kiến trúc hiện tại:
 
@@ -17,7 +17,8 @@ HiveMQ Cloud
 Node-RED
   |-- Debug thông điệp gốc
   |-- Ghi startTime
-  |-- Lọc alert + định dạng Firestore payload
+  |-- Lọc alert theo threshold + cooldown tiếng hét
+  |-- Định dạng Firestore payload
   |-- Firestore update devices/{deviceId}
   |-- Ghi endTime
   `-- Tính timediff
@@ -34,7 +35,7 @@ Các node chính:
 | `Nhận Alert Đồng Hồ` | `mqtt in` | Subscribe MQTT topic `wearable/+/alerts` từ HiveMQ. |
 | `Thông điệp gốc (JSON)` | `debug` | Hiển thị payload MQTT gốc. |
 | Change node `startTime` | `change` | Ghi timestamp bắt đầu xử lý vào `msg.startTime`. |
-| `Lọc & định dạng dữ liệu alert` | `function` | Kiểm tra threshold, xác định loại cảnh báo, tạo payload Firestore. |
+| `Lọc & định dạng dữ liệu alert` | `function` | Kiểm tra threshold, chặn lặp cảnh báo tiếng hét, xác định loại cảnh báo, tạo payload Firestore. |
 | `Data đẩy lên firestore` | `debug` | Hiển thị payload sẽ ghi Firestore. |
 | `đẩy alert lên firestore` | `Firestore out` | Update document `devices/{deviceId}`. |
 | Change node `endTime` | `change` | Ghi timestamp sau khi Firestore node xử lý xong. |
@@ -52,6 +53,8 @@ Các node chính:
 - MQTT protocol version: 4
 - Keepalive: 60 giây
 - QoS của MQTT input node: `2`
+- Username được ghi chú trong flow: `esp32s3_client`
+- Password được ghi chú trong flow: `Abcd13579!`
 
 ### Topic
 
@@ -91,7 +94,7 @@ msg.firestore = {
 };
 ```
 
-Document được cập nhật:
+Document được cập nhật theo `deviceId` trong payload:
 
 ```text
 devices/{deviceId}
@@ -111,9 +114,15 @@ Các loại `alert_type` trong flow:
 
 | Điều kiện | `alert_type` |
 | --- | --- |
-| Fall >= 0.8 và Scream >= 0.8 | `NGA_VA_HET` |
+| Fall >= 0.8 và Scream >= 0.5 | `NGA_VA_HET` |
 | Fall >= 0.8 | `PHAT_HIEN_NGA` |
-| Scream >= 0.8 | `PHAT_HIEN_TIENG_HET` |
+| Scream >= 0.5 | `PHAT_HIEN_TIENG_HET` |
+
+Message bị bỏ qua nếu:
+
+- Payload rỗng hoặc không có `deviceId`.
+- `fall_confidence < 0.8` và `scream_confidence < 0.5`.
+- Là cảnh báo `PHAT_HIEN_TIENG_HET` đang trong thời gian cooldown 30 giây của cùng thiết bị.
 
 ## Chặn Cảnh Báo Lặp Cho Tiếng Hét
 

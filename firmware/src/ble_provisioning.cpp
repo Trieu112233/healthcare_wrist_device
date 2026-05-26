@@ -5,7 +5,7 @@
 #include <Preferences.h>
 
 static const char* BLE_POP_CODE    = "12345678"; 
-static const char* BLE_SERVICE_NAME = "ESP32S3_01";
+static const char* BLE_SERVICE_NAME = "PROV_xiao_esp32s3_01";
 static const char* BLE_SERVICE_KEY  = NULL;
 
 static void SysProvEvent(arduino_event_t *sys_event) {
