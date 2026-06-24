@@ -11,7 +11,7 @@
 static unsigned long lastMotionTime = 0;
 static unsigned long lastTimeUpdate = 0;
 static const unsigned long SLEEP_TIMEOUT = 20000;
-static const float MOTION_THRESHOLD = 0.15f;
+static const float MOTION_THRESHOLD = 0.10f;
 
 void setup() {
     Serial.begin(115200); 

@@ -24,6 +24,27 @@ static AudioSignalContext audio_ctx;
 
 static float inference_imu_snapshot[IMU_TOTAL_SAMPLES * 6];
 
+struct FallMotionStats {
+    float maxAccelDeltaG;
+};
+
+static FallMotionStats calculate_fall_motion_stats() {
+    FallMotionStats stats = {0.0f};
+
+    for (size_t i = 0; i < IMU_TOTAL_SAMPLES; i++) {
+        float ax = inference_imu_snapshot[i * 6 + 0];
+        float ay = inference_imu_snapshot[i * 6 + 1];
+        float az = inference_imu_snapshot[i * 6 + 2];
+
+        float accelG = sqrtf(ax * ax + ay * ay + az * az) / 9.81f;
+        float accelDeltaG = fabsf(accelG - 1.0f);
+
+        if (accelDeltaG > stats.maxAccelDeltaG) stats.maxAccelDeltaG = accelDeltaG;
+    }
+
+    return stats;
+}
+
 static int extract_imu_signal(size_t offset, size_t length, float *out_ptr) {
     for (size_t i = 0; i < length; i++) {
         size_t logical_feature_idx = offset + i;
@@ -87,7 +108,7 @@ void run_ai_inference() {
     audio_signal.get_data = extract_audio_signal;
     
     ei_impulse_result_t scream_result;
-    EI_IMPULSE_ERROR scream_err = run_classifier(&impulse_handle_916888_1, &audio_signal, &scream_result, false);
+    EI_IMPULSE_ERROR scream_err = run_classifier(&impulse_handle_1011331_1, &audio_signal, &scream_result, false);
     
     uint32_t t4 = millis();
 
@@ -107,7 +128,7 @@ void run_ai_inference() {
 
     Serial.print("\nScream: ");
     if (scream_err == EI_IMPULSE_OK) {
-        for (size_t i = 0; i < impulse_handle_916888_1.impulse->label_count; i++) {
+        for (size_t i = 0; i < impulse_handle_1011331_1.impulse->label_count; i++) {
             Serial.print(scream_result.classification[i].label);
             Serial.print("=");
             Serial.print(scream_result.classification[i].value * 100.0f, 1);
@@ -136,11 +157,22 @@ void run_ai_inference() {
     }
 
     if (scream_err == EI_IMPULSE_OK) {
-        for (size_t i = 0; i < impulse_handle_916888_1.impulse->label_count; i++) {
+        for (size_t i = 0; i < impulse_handle_1011331_1.impulse->label_count; i++) {
             if (String(scream_result.classification[i].label) == "scream") { 
                 actScream = scream_result.classification[i].value;
             }
         }
+    }
+
+    FallMotionStats fallMotionStats = calculate_fall_motion_stats();
+    bool hasFallMotion = fallMotionStats.maxAccelDeltaG >= FALL_MIN_ACCEL_DELTA_G;
+
+    if (actFall >= FALL_ALERT_THRESHOLD && !hasFallMotion) {
+        portENTER_CRITICAL(&serialMutex);
+        Serial.printf("[FALL] Suppressed static pose: fall=%.2f maxAccelDeltaG=%.2f\n",
+                      actFall, fallMotionStats.maxAccelDeltaG);
+        portEXIT_CRITICAL(&serialMutex);
+        actFall = 0.0f;
     }
 
     updateAlertUI(actFall, actScream);
